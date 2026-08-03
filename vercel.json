@@ -1,0 +1,6 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/data/manifest.json", "destination": "/manifest.json" }
+  ]
+}

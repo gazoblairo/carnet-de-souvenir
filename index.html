@@ -21,7 +21,7 @@
       console.warn('Theme init error', error);
     }
   </script>
-  <link rel="manifest" href="data/manifest.json">
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
   <link rel="apple-touch-icon" href="assets/icons/icon.svg">
   <link rel="stylesheet" href="css/style.css?v=20260802a">
@@ -538,44 +538,46 @@
 
     <!-- Onboarding Modal -->
     <div class="modal-overlay" id="onboardingModal" hidden>
-      <div class="modal large" role="dialog" aria-labelledby="onboardingTitle">
+      <div class="modal large onboarding-modal" role="dialog" aria-labelledby="onboardingTitle">
         <div class="modal-header">
           <h3 id="onboardingTitle">Bienvenue dans Notre Carnet</h3>
         </div>
-        <p class="modal-intro">Pour commencer, indiquez les informations de votre couple.</p>
-        <form id="onboardingForm">
-          <div class="form-group">
-            <label for="onboardFirstName1">Mon prénom</label>
-            <input type="text" id="onboardFirstName1" required placeholder="Votre prénom">
-          </div>
-          <div class="form-group">
-            <label for="onboardFirstName2">Le prénom du partenaire</label>
-            <input type="text" id="onboardFirstName2" required placeholder="Prénom du partenaire">
-          </div>
-          <div class="form-group">
-            <label for="onboardNickname1">Mon surnom (optionnel)</label>
-            <input type="text" id="onboardNickname1" placeholder="Surnom">
-          </div>
-          <div class="form-group">
-            <label for="onboardNickname2">Le surnom du partenaire (optionnel)</label>
-            <input type="text" id="onboardNickname2" placeholder="Surnom du partenaire">
-          </div>
-          <div class="form-group">
-            <label for="onboardStartDate">Date de début de la relation</label>
-            <input type="date" id="onboardStartDate" required>
-          </div>
-          <div class="form-group avatar-group">
-            <label>Photo du couple</label>
-            <div class="avatar-preview" id="onboardingPhotoPreview">
-              <img src="assets/images/couple.svg" alt="Photo du couple">
-              <button type="button" class="btn-secondary btn-sm" id="onboardingPhotoBtn">Choisir une photo</button>
+        <div class="modal-body">
+          <p class="modal-intro">Pour commencer, indiquez les informations de votre couple.</p>
+          <form id="onboardingForm" class="onboarding-form">
+            <div class="form-group">
+              <label for="onboardFirstName1">Mon prénom</label>
+              <input type="text" id="onboardFirstName1" required placeholder="Votre prénom">
             </div>
-            <input type="file" id="onboardingPhotoInput" accept="image/*" hidden>
-          </div>
-          <div class="modal-actions">
-            <button type="submit" class="btn-primary">Démarrer</button>
-          </div>
-        </form>
+            <div class="form-group">
+              <label for="onboardFirstName2">Le prénom du partenaire</label>
+              <input type="text" id="onboardFirstName2" required placeholder="Prénom du partenaire">
+            </div>
+            <div class="form-group">
+              <label for="onboardNickname1">Mon surnom (optionnel)</label>
+              <input type="text" id="onboardNickname1" placeholder="Surnom">
+            </div>
+            <div class="form-group">
+              <label for="onboardNickname2">Le surnom du partenaire (optionnel)</label>
+              <input type="text" id="onboardNickname2" placeholder="Surnom du partenaire">
+            </div>
+            <div class="form-group">
+              <label for="onboardStartDate">Date de début de la relation</label>
+              <input type="date" id="onboardStartDate" required>
+            </div>
+            <div class="form-group avatar-group">
+              <label>Photo du couple</label>
+              <div class="avatar-preview" id="onboardingPhotoPreview">
+                <img src="assets/images/couple.svg" alt="Photo du couple">
+                <button type="button" class="btn-secondary btn-sm" id="onboardingPhotoBtn">Choisir une photo</button>
+              </div>
+              <input type="file" id="onboardingPhotoInput" accept="image/*" hidden>
+            </div>
+            <div class="modal-actions">
+              <button type="submit" class="btn-primary">Démarrer</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
 

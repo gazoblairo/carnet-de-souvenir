@@ -1,14 +1,14 @@
 const CACHE_NAME = 'carnet-v3';
 const ASSETS = [
-  './',
-  './index.html',
-  './css/style.css',
-  './js/script.js',
-  './data/manifest.json',
-  './assets/icons/icon.svg',
-  './assets/icons/icon-192.svg',
-  './assets/icons/icon-512.svg',
-  './assets/images/couple.svg'
+  '/',
+  '/index.html',
+  '/css/style.css',
+  '/js/script.js',
+  '/manifest.json',
+  '/assets/icons/icon.svg',
+  '/assets/icons/icon-192.svg',
+  '/assets/icons/icon-512.svg',
+  '/assets/images/couple.svg'
 ];
 
 self.addEventListener('install', (event) => {

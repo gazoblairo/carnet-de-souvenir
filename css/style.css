@@ -1664,6 +1664,47 @@ body::after {
   animation: fadeIn 0.2s ease;
 }
 
+.onboarding-modal {
+  display: flex;
+  flex-direction: column;
+  max-width: min(640px, calc(100vw - 2rem));
+  width: min(100%, 640px);
+  max-height: min(92vh, 760px);
+  overflow: hidden;
+  padding: 1.25rem;
+}
+
+.onboarding-modal .modal-header {
+  flex-shrink: 0;
+  margin-bottom: 0.75rem;
+}
+
+.onboarding-modal .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.onboarding-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.onboarding-form .form-group {
+  margin-bottom: 0;
+}
+
+.onboarding-form .modal-actions {
+  position: sticky;
+  bottom: 0;
+  justify-content: center;
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  background: var(--bg-card);
+}
+
 .modal-overlay[hidden] {
   display: none;
 }
@@ -1838,6 +1879,20 @@ body::after {
 
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
+  .onboarding-modal {
+    max-height: 94vh;
+    padding: 1rem;
+  }
+
+  .onboarding-modal .modal-body {
+    padding-right: 0;
+  }
+
+  .onboarding-form .modal-actions {
+    justify-content: center;
+    padding-top: 0.5rem;
+  }
+
   .navbar {
     margin: 0.75rem 0.75rem 0;
     border-radius: 24px;

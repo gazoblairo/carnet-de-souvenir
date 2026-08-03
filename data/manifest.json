@@ -2,7 +2,9 @@
   "name": "Carnet — Notre Histoire",
   "short_name": "Carnet",
   "description": "Votre carnet d'amour — souvenirs, photos et défis romantiques",
-  "start_url": "./index.html",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#faf5f7",
   "theme_color": "#e84393",
@@ -11,19 +13,19 @@
   "categories": ["lifestyle", "personalization"],
   "icons": [
     {
-      "src": "../assets/icons/icon.svg",
+      "src": "/assets/icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "../assets/icons/icon-192.svg",
+      "src": "/assets/icons/icon-192.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "../assets/icons/icon-512.svg",
+      "src": "/assets/icons/icon-512.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
