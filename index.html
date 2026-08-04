@@ -24,7 +24,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
   <link rel="apple-touch-icon" href="assets/icons/icon.svg">
-  <link rel="stylesheet" href="css/style.css?v=20260802a">
+  <link rel="stylesheet" href="css/style.css?v=20260803d">
 </head>
 <body>
   <div id="app">
@@ -39,6 +39,7 @@
       </button>
       <ul class="nav-links" id="navLinks">
         <li><a href="#accueil" class="nav-link active" data-section="accueil">❤️ Accueil</a></li>
+        <li><a href="#messages" class="nav-link" data-section="messages">💌 Messages ❤️</a></li>
         <li><a href="#souvenirs" class="nav-link" data-section="souvenirs">📝 Souvenirs</a></li>
         <li><a href="#multimedia" class="nav-link" data-section="multimedia">📷 Médias</a></li>
         <li><a href="#jeux" class="nav-link" data-section="jeux">🎮 Jeux</a></li>
@@ -141,6 +142,88 @@
         </div>
       </section>
 
+      <section id="messages" class="section">
+        <div class="messages-v2-shell">
+          <div class="messages-v2-header">
+            <div class="messages-v2-profile">
+              <div class="message-avatar-stack" aria-hidden="true">
+                <img id="messageAvatarPrimary" src="assets/images/couple.svg" alt="Photo de profil de l’amoureux" class="message-avatar message-avatar--primary">
+                <img id="messageAvatarSecondary" src="assets/images/couple.svg" alt="Photo de profil de l’amoureuse" class="message-avatar message-avatar--secondary">
+                <span class="message-avatar-heart">♡</span>
+              </div>
+              <div class="messages-v2-profile-info">
+                <h2>Messages ❤️</h2>
+                <p class="messages-v2-names" id="messagesCoupleNames">Marie &amp; Thomas</p>
+                <div class="messages-v2-status">
+                  <span class="status-dot"></span>
+                  <span id="messagesStatusText">En ligne • prêt à s’écrire</span>
+                </div>
+              </div>
+            </div>
+            <button class="messages-v2-call-btn" id="messageVideoCallBtn" type="button">📹 Appel vidéo</button>
+          </div>
+
+          <div class="messages-v2-toolbar">
+            <label class="messages-v2-search" for="messageSearch">
+              <span>🔎</span>
+              <input type="search" id="messageSearch" placeholder="Rechercher dans la conversation..." aria-label="Rechercher un message">
+            </label>
+            <div class="messages-v2-filters" role="group" aria-label="Filtres de messages">
+              <button class="message-filter-chip active" type="button" data-view="all">Tous</button>
+              <button class="message-filter-chip" type="button" data-view="favorites">Favoris</button>
+              <button class="message-filter-chip" type="button" data-view="pinned">Épinglés</button>
+            </div>
+          </div>
+
+          <div class="messages-v2-pairing" id="messagesPairingBlock">
+            <div class="messages-v2-pairing-actions">
+              <button class="messages-v2-call-btn" id="invitePartnerBtn" type="button">❤️ Inviter mon partenaire</button>
+              <button class="messages-v2-call-btn" id="joinPartnerTriggerBtn" type="button">❤️ Rejoindre mon partenaire</button>
+            </div>
+            <div class="messages-v2-pairing-status" id="pairingStatus">Préparation de la liaison entre deux comptes…</div>
+            <div class="messages-v2-pairing-join" id="pairingJoinSection" hidden>
+              <input type="text" id="partnerCodeInput" placeholder="Saisissez le code de votre partenaire" aria-label="Code de votre partenaire">
+              <button class="btn-primary" id="joinPartnerSubmitBtn" type="button">Valider</button>
+            </div>
+            <div class="messages-v2-pairing-code" id="pairingCodeDisplay" hidden></div>
+          </div>
+
+          <div class="messages-v2-gate" id="messagesPairingGate" hidden>
+            <span class="empty-icon">💌</span>
+            <p>Vous devez d'abord inviter ou rejoindre votre partenaire pour utiliser les messages.</p>
+          </div>
+
+          <div class="messages-v2-thread" id="modernMessagesList"></div>
+          <div class="typing-indicator" id="typingIndicator" hidden>
+            <span></span><span></span><span></span>
+            <strong id="typingText">Votre moitié est en train d’écrire…</strong>
+          </div>
+          <div class="reply-preview" id="replyPreview" hidden></div>
+
+          <div class="messages-v2-composer">
+            <div class="messages-v2-quick-reactions" aria-label="Réactions rapides">
+              <button type="button" class="message-quick-reaction" data-emoji="❤️">❤️</button>
+              <button type="button" class="message-quick-reaction" data-emoji="😂">😂</button>
+              <button type="button" class="message-quick-reaction" data-emoji="😍">😍</button>
+              <button type="button" class="message-quick-reaction" data-emoji="👍">👍</button>
+            </div>
+            <div class="composer-area">
+              <textarea id="messageComposer" rows="1" placeholder="Écrivez un mot doux..."></textarea>
+              <button id="messageSendBtn" class="message-send-btn" type="button">Envoyer</button>
+            </div>
+            <div class="message-heartburst" id="messageHeartBurst" aria-hidden="true"></div>
+          </div>
+
+          <div class="messages-empty" id="modernMessagesEmpty" hidden>
+            <span class="empty-icon">💌</span>
+            <p>Aucun message à afficher pour le moment.</p>
+            <p class="empty-sub">Commencez la conversation avec un doux mot.</p>
+          </div>
+          <input type="file" id="messagePhotoInputPrimary" accept="image/*" hidden>
+          <input type="file" id="messagePhotoInputSecondary" accept="image/*" hidden>
+        </div>
+      </section>
+
       <section id="souvenirs" class="section">
         <div class="section-stack">
           <div class="feature-card">
@@ -157,30 +240,6 @@
               <p>Aucun souvenir pour l'instant</p>
               <p class="empty-sub">Commencez à écrire votre histoire !</p>
             </div>
-          </div>
-
-          <div class="feature-card">
-            <section id="messages" class="content-panel">
-              <div class="section-header">
-                <h2>Messages d'amour</h2>
-                <button class="btn-primary" id="addMessageBtn">+ Ajouter</button>
-              </div>
-              <div class="memory-filters">
-                <input type="search" id="messageSearch" placeholder="Rechercher un message..." aria-label="Rechercher">
-                <select id="messageSort">
-                  <option value="date_desc">Plus récents</option>
-                  <option value="date_asc">Plus anciens</option>
-                  <option value="author">Auteur</option>
-                  <option value="title">Titre</option>
-                </select>
-              </div>
-              <div class="messages-list" id="messagesList"></div>
-              <div class="empty-state" id="messagesEmpty" hidden>
-                <span class="empty-icon">💌</span>
-                <p>Aucun message pour l'instant</p>
-                <p class="empty-sub">Partagez vos mots doux.</p>
-              </div>
-            </section>
           </div>
 
           <div class="feature-card">
@@ -597,6 +656,6 @@
     </div>
   </div>
 
-  <script src="js/script.js?v=20260802a"></script>
+  <script src="js/script.js?v=20260803d"></script>
 </body>
 </html>

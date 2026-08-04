@@ -9,6 +9,7 @@ const STORAGE_KEYS = {
   challengeHistory: 'carnet_challenge_history',
   gameState: 'carnet_game_state',
   messages: 'carnet_messages',
+  messageSettings: 'carnet_message_settings',
   dates: 'carnet_dates',
   goals: 'carnet_goals',
   places: 'carnet_places'
@@ -725,6 +726,9 @@ const DEFAULT_SETTINGS = {
   theme: 'dark'
 };
 
+const MESSAGE_HEADER_STORAGE_KEY = 'carnet_message_header';
+const PAIRING_STORAGE_KEY = 'carnet_pairing_state';
+
 let currentLightboxId = null;
 let deferredPrompt = null;
 let settingsPhotoDataUrl1 = null;
@@ -752,6 +756,12 @@ function save(key, data) {
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function generatePairingCode() {
+  const prefix = 'CARNET';
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `${prefix}-${suffix}`;
 }
 
 function openMediaDatabase() {
@@ -837,107 +847,594 @@ function showToast(message) {
 
 /* ===== Messages / Dates / Goals / Places ===== */
 
+let activeReplyMessageId = null;
+let activeEditMessageId = null;
+let messageTypingTimer = null;
+let activeMessageView = 'all';
+
+function getMessageSettings() {
+  return load(STORAGE_KEYS.messageSettings || 'carnet_message_settings', { background: 'sunset' });
+}
+
+function saveMessageSettings(settings) {
+  save(STORAGE_KEYS.messageSettings || 'carnet_message_settings', settings);
+}
+
+function getMessageHeaderState() {
+  const stored = load(MESSAGE_HEADER_STORAGE_KEY, {});
+  const settings = getSettings();
+  return {
+    photo1: stored.photo1 || settings.photo1 || settings.couplePhoto || DEFAULT_SETTINGS.photo1,
+    photo2: stored.photo2 || settings.photo2 || settings.couplePhoto || DEFAULT_SETTINGS.photo2,
+    firstName1: settings.firstName1 || stored.firstName1 || DEFAULT_SETTINGS.firstName1,
+    firstName2: settings.firstName2 || stored.firstName2 || DEFAULT_SETTINGS.firstName2,
+    nickname1: settings.nickname1 || stored.nickname1 || '',
+    nickname2: settings.nickname2 || stored.nickname2 || '',
+    showNicknames: typeof settings.showNicknames === 'boolean' ? settings.showNicknames : !!stored.showNicknames
+  };
+}
+
+function saveMessageHeaderState(partial = {}) {
+  const current = getMessageHeaderState();
+  const next = { ...current, ...partial };
+  save(MESSAGE_HEADER_STORAGE_KEY, next);
+  return next;
+}
+
+function updateMessageHeader() {
+  const title = document.getElementById('messagesCoupleNames');
+  const subtitle = document.getElementById('messagesStatusText');
+  const avatarPrimary = document.getElementById('messageAvatarPrimary');
+  const avatarSecondary = document.getElementById('messageAvatarSecondary');
+  const settings = getSettings();
+  const state = getMessageHeaderState();
+  const firstName1 = settings.firstName1 || state.firstName1 || DEFAULT_SETTINGS.firstName1;
+  const firstName2 = settings.firstName2 || state.firstName2 || DEFAULT_SETTINGS.firstName2;
+  const nickname1 = settings.nickname1 || state.nickname1 || '';
+  const nickname2 = settings.nickname2 || state.nickname2 || '';
+
+  if (title) {
+    if (settings.showNicknames && (nickname1 || nickname2)) {
+      title.textContent = `${nickname1 || firstName1} & ${nickname2 || firstName2}`;
+    } else {
+      title.textContent = `${firstName1} & ${firstName2}`;
+    }
+  }
+
+  if (subtitle) {
+    const detail = nickname2 ? `${nickname2} • en ligne` : 'En ligne • prêt à s’écrire';
+    subtitle.textContent = detail;
+  }
+
+  if (avatarPrimary) {
+    avatarPrimary.src = state.photo1 || settings.photo1 || settings.couplePhoto || DEFAULT_SETTINGS.photo1;
+  }
+
+  if (avatarSecondary) {
+    avatarSecondary.src = state.photo2 || settings.photo2 || settings.couplePhoto || DEFAULT_SETTINGS.photo2;
+  }
+
+  saveMessageHeaderState({
+    firstName1,
+    firstName2,
+    nickname1,
+    nickname2,
+    showNicknames: !!settings.showNicknames
+  });
+}
+
+function getPairingState() {
+  const stored = load(PAIRING_STORAGE_KEY, {});
+  const baseState = {
+    myCode: stored.myCode || generatePairingCode(),
+    linked: !!stored.linked,
+    partnerCode: stored.partnerCode || '',
+    linkedAt: stored.linkedAt || null
+  };
+
+  if (!stored.myCode || stored.myCode !== baseState.myCode) {
+    save(PAIRING_STORAGE_KEY, baseState);
+  }
+
+  return baseState;
+}
+
+function savePairingState(partial = {}) {
+  const current = getPairingState();
+  const next = { ...current, ...partial };
+  save(PAIRING_STORAGE_KEY, next);
+  return next;
+}
+
+function updateMessagesPairingUI() {
+  const state = getPairingState();
+  const pairingBlock = document.getElementById('messagesPairingBlock');
+  const pairingStatus = document.getElementById('pairingStatus');
+  const pairingJoinSection = document.getElementById('pairingJoinSection');
+  const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
+  const pairingGate = document.getElementById('messagesPairingGate');
+  const thread = document.getElementById('modernMessagesList');
+  const composer = document.getElementById('messageComposer');
+  const sendButton = document.getElementById('messageSendBtn');
+  const searchInput = document.getElementById('messageSearch');
+  const videoCallButton = document.getElementById('messageVideoCallBtn');
+  const inviteButton = document.getElementById('invitePartnerBtn');
+  const joinTriggerButton = document.getElementById('joinPartnerTriggerBtn');
+  const joinSubmitButton = document.getElementById('joinPartnerSubmitBtn');
+  const partnerCodeInput = document.getElementById('partnerCodeInput');
+  const isLinked = !!state.linked;
+
+  if (pairingStatus) {
+    pairingStatus.textContent = isLinked
+      ? `✅ Compte lié à ${state.partnerCode || 'votre partenaire'} — la messagerie est prête.`
+      : 'Vous devez d\'abord inviter ou rejoindre votre partenaire pour utiliser les messages.';
+  }
+
+  if (pairingJoinSection) {
+    pairingJoinSection.hidden = isLinked;
+  }
+
+  if (pairingCodeDisplay) {
+    pairingCodeDisplay.hidden = isLinked;
+    if (!isLinked) {
+      pairingCodeDisplay.innerHTML = `<strong>Code d’invitation</strong><div>${state.myCode}</div>`;
+    }
+  }
+
+  if (pairingGate) {
+    pairingGate.hidden = isLinked;
+  }
+
+  if (thread) {
+    thread.hidden = !isLinked;
+  }
+
+  if (composer) {
+    composer.disabled = !isLinked;
+    composer.placeholder = isLinked ? 'Écrivez un mot doux...' : 'Liaison requise';
+  }
+
+  if (sendButton) {
+    sendButton.disabled = !isLinked;
+  }
+
+  if (searchInput) {
+    searchInput.disabled = !isLinked;
+  }
+
+  if (videoCallButton) {
+    videoCallButton.disabled = !isLinked;
+    videoCallButton.title = isLinked ? 'Appel vidéo' : 'Liez votre compte pour activer l’appel vidéo';
+  }
+
+  if (inviteButton) {
+    inviteButton.disabled = isLinked;
+  }
+
+  if (joinTriggerButton) {
+    joinTriggerButton.disabled = isLinked;
+  }
+
+  if (joinSubmitButton && partnerCodeInput) {
+    joinSubmitButton.disabled = isLinked;
+  }
+}
+
+function applyMessageBackground() {
+  const thread = document.getElementById('modernMessagesList');
+  const settings = getMessageSettings();
+
+  if (thread) {
+    thread.setAttribute('data-background', settings.background || 'sunset');
+  }
+}
+
+function normalizeMessage(message, index = 0) {
+  if (!message || typeof message !== 'object') {
+    return {
+      id: generateId(),
+      sender: 'me',
+      text: '',
+      type: 'text',
+      createdAt: Date.now() + index,
+      time: '',
+      status: 'read',
+      reactions: {},
+      pinned: false,
+      favorite: false,
+      edited: false,
+      replyTo: null,
+      deletedForMe: false,
+      deletedForEveryone: false,
+      metadata: null,
+      author: 'Vous'
+    };
+  }
+
+  const createdAt = message.createdAt || message.date || Date.now() + index;
+  const sender = message.sender || (message.author === 'Vous' ? 'me' : 'partner');
+  return {
+    id: message.id || generateId(),
+    sender,
+    text: message.text || message.title || '',
+    type: message.type || 'text',
+    createdAt,
+    time: message.time || new Date(createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    status: message.status || (sender === 'me' ? 'read' : 'sent'),
+    reactions: message.reactions || {},
+    pinned: !!message.pinned,
+    favorite: !!message.favorite,
+    edited: !!message.edited,
+    replyTo: message.replyTo || null,
+    deletedForMe: !!message.deletedForMe,
+    deletedForEveryone: !!message.deletedForEveryone,
+    metadata: message.metadata || null,
+    author: message.author || (sender === 'me' ? 'Vous' : 'Votre moitié')
+  };
+}
+
 function getMessages() {
-  return load(STORAGE_KEYS.messages, []);
+  const stored = load(STORAGE_KEYS.messages, []);
+  const items = Array.isArray(stored) ? stored : (stored && Array.isArray(stored.messages) ? stored.messages : []);
+  return items.map((message, index) => normalizeMessage(message, index));
 }
 
 function saveMessages(messages) {
-  save(STORAGE_KEYS.messages, messages);
+  const normalized = messages.map((message, index) => normalizeMessage(message, index));
+  save(STORAGE_KEYS.messages, normalized);
   renderMessages();
   renderTimeline();
   updateStats();
 }
 
+function getMessageDisplayName(sender) {
+  const settings = getSettings();
+  return sender === 'me' ? (settings.firstName1 || 'Vous') : (settings.firstName2 || 'Votre moitié');
+}
+
+function getMessageContentMarkup(message, allMessages) {
+  if (message.type === 'image' && message.metadata?.src) {
+    return `<div class="message-attachment"><img src="${message.metadata.src}" alt="Photo envoyée"></div>`;
+  }
+
+  if (message.type === 'music' && message.metadata?.name) {
+    return `<div class="message-attachment">🎵 <strong>${escapeHtml(message.metadata.name)}</strong></div>`;
+  }
+
+  if (message.type === 'document' && message.metadata?.name) {
+    return `<div class="message-attachment">📄 <strong>${escapeHtml(message.metadata.name)}</strong></div>`;
+  }
+
+  if (message.type === 'voice' && message.metadata?.name) {
+    return `<div class="message-attachment">🎤 <strong>${escapeHtml(message.metadata.name)}</strong></div>`;
+  }
+
+  const replyMarkup = message.replyTo ? (() => {
+    const replied = allMessages.find(item => item.id === message.replyTo);
+    return replied ? `<div class="reply-preview">↩ ${escapeHtml(replied.text || 'Pièce jointe')}</div>` : '';
+  })() : '';
+
+  return `${replyMarkup}<div>${escapeHtml(message.text || 'Message')}</div>`;
+}
+
 function renderMessages(filter = '', sortValue = 'date_desc') {
   const messages = getMessages();
-  const list = document.getElementById('messagesList');
-  const empty = document.getElementById('messagesEmpty');
+  const list = document.getElementById('modernMessagesList');
+  const empty = document.getElementById('modernMessagesEmpty');
+  const search = document.getElementById('messageSearch');
+  const searchValue = (filter || search?.value || '').toLowerCase();
+  const typing = document.getElementById('typingIndicator');
+  const thread = document.getElementById('modernMessagesList');
+  const settings = getMessageSettings();
 
-  const filtered = messages
+  if (thread) {
+    thread.setAttribute('data-background', settings.background || 'sunset');
+  }
+
+  const visible = messages
     .filter(message => {
-      const search = filter.toLowerCase();
-      return !search || message.title.toLowerCase().includes(search) || message.text.toLowerCase().includes(search);
+      if (message.deletedForEveryone) return false;
+      if (message.deletedForMe && message.sender === 'me') return false;
+      if (activeMessageView === 'favorites' && !message.favorite) return false;
+      if (activeMessageView === 'pinned' && !message.pinned) return false;
+      if (!searchValue) return true;
+      const haystack = `${message.text || ''} ${message.metadata?.name || ''} ${message.author || ''}`.toLowerCase();
+      return haystack.includes(searchValue);
     })
     .sort((a, b) => {
-      if (sortValue === 'author') return (a.author || '').localeCompare(b.author || '');
-      if (sortValue === 'title') return (a.title || '').localeCompare(b.title || '');
-      if (sortValue === 'date_asc') return new Date(a.createdAt || a.date || 0) - new Date(b.createdAt || b.date || 0);
-      return new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0);
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+      return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
     });
 
+  if (!list) return;
   list.innerHTML = '';
 
-  if (filtered.length === 0) {
+  if (visible.length === 0) {
     empty.hidden = false;
+    if (typing) typing.hidden = true;
     return;
   }
 
   empty.hidden = true;
 
-  filtered.forEach(message => {
-    const card = document.createElement('div');
-    card.className = 'memory-card';
-    card.innerHTML = `
-      <span class="memory-mood">💌</span>
-      <div class="memory-content">
-        <div class="memory-title">${escapeHtml(message.title)}</div>
-        <div class="memory-date">${formatDate(new Date(message.createdAt || Date.now()).toISOString().split('T')[0])}</div>
-        <div class="memory-text">${escapeHtml(message.text)}</div>
-        <div class="memory-text">${escapeHtml(message.author || 'Votre message')}</div>
+  visible.forEach(message => {
+    const bubble = document.createElement('article');
+    bubble.className = `message-bubble ${message.sender === 'me' ? 'message-bubble--mine' : 'message-bubble--their'}${message.pinned ? ' is-pinned' : ''}${message.favorite ? ' is-favorite' : ''}`;
+    bubble.dataset.messageId = message.id;
+    const reactions = Object.entries(message.reactions || {})
+      .map(([emoji, count]) => `<button class="message-reaction-chip" type="button" data-action="react" data-reaction="${emoji}" data-message-id="${message.id}">${emoji} ${count}</button>`)
+      .join('');
+    const attachmentMarkup = getMessageContentMarkup(message, messages);
+    bubble.innerHTML = `
+      <div class="message-bubble-header">
+        <span>${escapeHtml(getMessageDisplayName(message.sender))}</span>
+        <div class="message-bubble-actions">
+          <button class="message-action-btn" type="button" data-action="reply" data-message-id="${message.id}">↩</button>
+          <button class="message-action-btn" type="button" data-action="edit" data-message-id="${message.id}">✏️</button>
+          <button class="message-action-btn" type="button" data-action="pin" data-message-id="${message.id}">${message.pinned ? '📌' : '📍'}</button>
+          <button class="message-action-btn" type="button" data-action="favorite" data-message-id="${message.id}">${message.favorite ? '⭐' : '☆'}</button>
+          <button class="message-action-btn" type="button" data-action="delete-for-me" data-message-id="${message.id}">🗑️</button>
+        </div>
       </div>
-      <div class="memory-actions">
-        <button data-action="edit-message" data-id="${message.id}" title="Modifier">✏️</button>
-        <button data-action="delete-message" data-id="${message.id}" title="Supprimer">🗑️</button>
+      <div class="message-bubble-content">${attachmentMarkup}</div>
+      <div class="message-reactions">${reactions || '<button class="message-reaction-chip" type="button" data-action="react" data-reaction="❤️" data-message-id="${message.id}">❤️</button><button class="message-reaction-chip" type="button" data-action="react" data-reaction="😂" data-message-id="${message.id}">😂</button><button class="message-reaction-chip" type="button" data-action="react" data-reaction="😍" data-message-id="${message.id}">😍</button><button class="message-reaction-chip" type="button" data-action="react" data-reaction="👍" data-message-id="${message.id}">👍</button>'}</div>
+      <div class="message-bubble-footer">
+        <span>${message.edited ? '✏️ ' : ''}${message.sender === 'me' ? (message.status === 'read' ? '✓✓' : message.status === 'delivered' ? '✓' : '⏱') : ''}</span>
+        <span>${escapeHtml(message.time || '')}</span>
       </div>
     `;
-    list.appendChild(card);
+    list.appendChild(bubble);
   });
 
-  list.querySelectorAll('[data-action="edit-message"]').forEach(btn => {
-    btn.addEventListener('click', () => editMessage(btn.dataset.id));
-  });
-
-  list.querySelectorAll('[data-action="delete-message"]').forEach(btn => {
-    btn.addEventListener('click', () => deleteMessage(btn.dataset.id));
-  });
+  list.scrollTop = list.scrollHeight;
 }
 
-function openMessageModal(id = null) {
-  const existing = id ? getMessages().find(message => message.id === id) : null;
-  const title = window.prompt('Titre du message', existing?.title || '');
-  if (title === null) return;
-  const text = window.prompt('Votre message d’amour', existing?.text || '');
-  if (text === null) return;
+function updateComposerState() {
+  const preview = document.getElementById('replyPreview');
+  const composer = document.getElementById('messageComposer');
+  if (!preview) return;
 
-  const message = {
-    id: id || generateId(),
-    title: title.trim() || 'Sans titre',
-    text: text.trim() || 'Message ajouté',
-    author: existing?.author || 'Vous',
-    createdAt: existing?.createdAt || Date.now()
-  };
-
-  const messages = getMessages();
-  if (existing) {
-    const updated = messages.map(item => item.id === id ? message : item);
-    saveMessages(updated);
-    showToast('Message modifié 💌');
+  if (activeReplyMessageId) {
+    const target = getMessages().find(message => message.id === activeReplyMessageId);
+    preview.hidden = false;
+    preview.innerHTML = `↩ Réponse à <strong>${escapeHtml(target?.text || 'ce message')}</strong>`;
   } else {
-    messages.push(message);
-    saveMessages(messages);
-    showToast('Message ajouté 💌');
+    preview.hidden = true;
+    preview.innerHTML = '';
+  }
+
+  if (composer && activeEditMessageId) {
+    const target = getMessages().find(message => message.id === activeEditMessageId);
+    composer.placeholder = `Modifier : ${target?.text || 'votre message'}`;
+  } else if (composer) {
+    composer.placeholder = 'Écrivez un mot doux...';
   }
 }
 
-function editMessage(id) {
-  openMessageModal(id);
+function setTypingIndicator(active, label = 'Thomas est en train d\'écrire...') {
+  const typing = document.getElementById('typingIndicator');
+  const typingText = document.getElementById('typingText');
+  if (!typing) return;
+  if (typingText) typingText.textContent = label;
+  typing.hidden = !active;
 }
 
-function deleteMessage(id) {
-  if (!window.confirm('Supprimer ce message ?')) return;
-  const messages = getMessages().filter(message => message.id !== id);
-  saveMessages(messages);
-  showToast('Message supprimé');
+function createMessagePayload(text, type = 'text', metadata = null, replyId = null) {
+  return {
+    id: generateId(),
+    sender: 'me',
+    text: text || '',
+    type,
+    createdAt: Date.now(),
+    time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    status: 'read',
+    reactions: {},
+    pinned: false,
+    favorite: false,
+    edited: false,
+    replyTo: replyId,
+    deletedForMe: false,
+    deletedForEveryone: false,
+    metadata,
+    author: 'Vous'
+  };
+}
+
+function handleMessageAction(action, messageId, reaction = null) {
+  const messages = getMessages();
+  const target = messages.find(message => message.id === messageId);
+  if (!target) return;
+
+  if (action === 'reply') {
+    activeReplyMessageId = messageId;
+    updateComposerState();
+    showToast('Réponse préparée ✨');
+    return;
+  }
+
+  if (action === 'edit') {
+    if (target.sender !== 'me') {
+      showToast('Seuls vos messages peuvent être modifiés');
+      return;
+    }
+    activeEditMessageId = messageId;
+    const composer = document.getElementById('messageComposer');
+    if (composer) {
+      composer.value = target.text || '';
+      composer.focus();
+    }
+    updateComposerState();
+    showToast('Édition activée');
+    return;
+  }
+
+  if (action === 'copy') {
+    const text = target.text || target.metadata?.name || '';
+    if (text) {
+      navigator.clipboard?.writeText(text).catch(() => {});
+      showToast('Message copié');
+    }
+    return;
+  }
+
+  if (action === 'pin') {
+    target.pinned = !target.pinned;
+    saveMessages(messages);
+    showToast(target.pinned ? 'Message épinglé' : 'Message désépinglé');
+    return;
+  }
+
+  if (action === 'favorite') {
+    target.favorite = !target.favorite;
+    saveMessages(messages);
+    showToast(target.favorite ? 'Ajouté aux favoris' : 'Retiré des favoris');
+    return;
+  }
+
+  if (action === 'react') {
+    const selectedReaction = reaction || '❤️';
+    target.reactions[selectedReaction] = (target.reactions[selectedReaction] || 0) + 1;
+    saveMessages(messages);
+    showToast(`Réaction ${selectedReaction} ajoutée`);
+    return;
+  }
+
+  if (action === 'delete-for-me') {
+    target.deletedForMe = true;
+    saveMessages(messages);
+    showToast('Supprimé pour vous');
+    return;
+  }
+
+  if (action === 'delete-for-everyone') {
+    target.deletedForEveryone = true;
+    saveMessages(messages);
+    showToast('Supprimé pour tout le monde');
+  }
+}
+
+function triggerMessageHeartBurst() {
+  const burst = document.getElementById('messageHeartBurst');
+  if (!burst) return;
+  const hearts = ['💗', '💖', '💕'];
+  burst.innerHTML = '';
+  hearts.forEach((emoji, index) => {
+    const heart = document.createElement('span');
+    heart.textContent = emoji;
+    heart.style.left = `${12 + index * 10}px`;
+    heart.style.top = `${-6 + index * 6}px`;
+    burst.appendChild(heart);
+  });
+  setTimeout(() => { burst.innerHTML = ''; }, 900);
+}
+
+function sendTextMessage(text) {
+  if (!text.trim()) return;
+
+  const messages = getMessages();
+  if (activeEditMessageId) {
+    const target = messages.find(message => message.id === activeEditMessageId);
+    if (target) {
+      target.text = text.trim();
+      target.edited = true;
+      target.time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      saveMessages(messages);
+      showToast('Message modifié ✨');
+    }
+    activeEditMessageId = null;
+  } else {
+    messages.push(createMessagePayload(text.trim(), 'text', null, activeReplyMessageId));
+    saveMessages(messages);
+    showToast('Message envoyé ✨');
+  }
+
+  triggerMessageHeartBurst();
+  activeReplyMessageId = null;
+  const composer = document.getElementById('messageComposer');
+  if (composer) composer.value = '';
+  updateComposerState();
+
+  if (!activeEditMessageId) {
+    setTypingIndicator(true);
+    clearTimeout(messageTypingTimer);
+    messageTypingTimer = setTimeout(() => {
+      const replyText = text.trim().toLowerCase().includes('bonjour') || text.trim().toLowerCase().includes('salut')
+        ? 'Je suis là mon cœur 💕'
+        : 'J’aime ce que tu dis, continue 💖';
+      const replyMessage = createMessagePayload(replyText, 'text', null, null);
+      replyMessage.sender = 'partner';
+      replyMessage.author = 'Votre moitié';
+      replyMessage.status = 'delivered';
+      const items = getMessages();
+      items.push(replyMessage);
+      saveMessages(items);
+      setTypingIndicator(false);
+    }, 1200);
+  }
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function attachMedia(type, inputId, fallbackText) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.click();
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    const messages = getMessages();
+    let metadata = null;
+    let messageText = fallbackText;
+
+    if (type === 'photo') {
+      const src = await readFileAsDataUrl(file);
+      metadata = { src, name: file.name, mimeType: file.type };
+      messageText = '📷 Photo envoyée';
+    } else if (type === 'music') {
+      const src = await readFileAsDataUrl(file);
+      metadata = { src, name: file.name, mimeType: file.type };
+      messageText = '🎵 Musique envoyée';
+    } else if (type === 'document') {
+      metadata = { name: file.name, mimeType: file.type };
+      messageText = '📄 Document envoyé';
+    } else if (type === 'voice') {
+      const src = await readFileAsDataUrl(file);
+      metadata = { src, name: file.name, mimeType: file.type };
+      messageText = '🎤 Note vocale envoyée';
+    }
+
+    messages.push(createMessagePayload(messageText, type, metadata, activeReplyMessageId));
+    saveMessages(messages);
+    showToast('Pièce jointe envoyée');
+    activeReplyMessageId = null;
+    updateComposerState();
+  };
+}
+
+function ensureDefaultMessages(messages) {
+  if (messages.length > 0) return messages;
+  const initialMessages = [
+    createMessagePayload('Bonjour mon cœur 💕', 'text', null, null),
+    createMessagePayload('Je pensais à toi et à notre histoire.', 'text', null, null),
+    createMessagePayload('On a déjà tant de beaux moments à partager.', 'text', null, null)
+  ];
+  initialMessages[0].sender = 'partner';
+  initialMessages[0].author = 'Votre moitié';
+  initialMessages[0].status = 'delivered';
+  initialMessages[1].sender = 'me';
+  initialMessages[1].author = 'Vous';
+  initialMessages[2].sender = 'partner';
+  initialMessages[2].author = 'Votre moitié';
+  initialMessages[2].status = 'delivered';
+  return initialMessages;
 }
 
 function deleteTimelineItem(id, type) {
@@ -1164,8 +1661,8 @@ function renderTimeline() {
 
   const items = [
     ...getMemories().map(memory => ({ id: memory.id, title: memory.title, date: memory.date, type: 'Souvenir', icon: '📝' })),
-    ...getMessages().map(message => ({ id: message.id, title: message.title, date: message.createdAt, type: 'Message', icon: '💌' })),
-    ...getDates().map(entry => ({ id: entry.id, title: entry.title, date: entry.date, type: 'Événement', icon: '📅' }))
+    ...getMessages().map(message => ({ id: message.id, title: message.text || message.title || 'Message', date: message.createdAt || Date.now(), type: 'Message', icon: '💌' })),
+    ...getDates().map(entry => ({ id: entry.id, title: entry.title, date: entry.date || Date.now(), type: 'Événement', icon: '📅' }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
   list.innerHTML = '';
@@ -1245,23 +1742,217 @@ function bindEnterToFormSubmit(form) {
   });
 }
 
+function initMessageProfilePhotos() {
+  const avatarPrimary = document.getElementById('messageAvatarPrimary');
+  const avatarSecondary = document.getElementById('messageAvatarSecondary');
+  const inputPrimary = document.getElementById('messagePhotoInputPrimary');
+  const inputSecondary = document.getElementById('messagePhotoInputSecondary');
+
+  const applyHeaderPhoto = (role, dataUrl) => {
+    if (!dataUrl) return;
+    if (role === 'primary') {
+      saveMessageHeaderState({ photo1: dataUrl });
+      if (avatarPrimary) avatarPrimary.src = dataUrl;
+    } else {
+      saveMessageHeaderState({ photo2: dataUrl });
+      if (avatarSecondary) avatarSecondary.src = dataUrl;
+    }
+    updateMessageHeader();
+  };
+
+  if (avatarPrimary && inputPrimary) {
+    avatarPrimary.addEventListener('click', () => inputPrimary.click());
+    inputPrimary.addEventListener('change', (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => applyHeaderPhoto('primary', e.target.result);
+      reader.onerror = () => showToast('Impossible de lire cette image.');
+      reader.readAsDataURL(file);
+      inputPrimary.value = '';
+    });
+  }
+
+  if (avatarSecondary && inputSecondary) {
+    avatarSecondary.addEventListener('click', () => inputSecondary.click());
+    inputSecondary.addEventListener('change', (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => applyHeaderPhoto('secondary', e.target.result);
+      reader.onerror = () => showToast('Impossible de lire cette image.');
+      reader.readAsDataURL(file);
+      inputSecondary.value = '';
+    });
+  }
+}
+
 function initMessages() {
-  const btn = document.getElementById('addMessageBtn');
+  const btn = document.getElementById('messageSendBtn');
   const search = document.getElementById('messageSearch');
-  const sort = document.getElementById('messageSort');
+  const composer = document.getElementById('messageComposer');
+  const emojiButtons = document.querySelectorAll('.message-quick-reaction');
+  const thread = document.getElementById('modernMessagesList');
+  const filterButtons = document.querySelectorAll('.message-filter-chip');
+  const inviteButton = document.getElementById('invitePartnerBtn');
+  const joinTriggerButton = document.getElementById('joinPartnerTriggerBtn');
+  const joinSubmitButton = document.getElementById('joinPartnerSubmitBtn');
+  const partnerCodeInput = document.getElementById('partnerCodeInput');
+  const pairingJoinSection = document.getElementById('pairingJoinSection');
 
   if (btn) {
-    btn.addEventListener('click', () => openMessageModal());
+    btn.addEventListener('click', () => {
+      const state = getPairingState();
+      if (!state.linked) {
+        showToast('Vous devez d\'abord lier votre compte à votre partenaire.');
+        return;
+      }
+      if (composer?.value.trim()) {
+        sendTextMessage(composer.value);
+      } else {
+        composer?.focus();
+      }
+    });
+  }
+
+  if (composer) {
+    composer.addEventListener('keydown', (event) => {
+      const state = getPairingState();
+      if (!state.linked) {
+        event.preventDefault();
+        showToast('Vous devez d\'abord lier votre compte à votre partenaire.');
+        return;
+      }
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendTextMessage(composer.value);
+      }
+    });
   }
 
   if (search) {
-    search.addEventListener('input', (e) => renderMessages(e.target.value, sort?.value || 'date_desc'));
+    search.addEventListener('input', (e) => renderMessages(e.target.value));
   }
 
-  if (sort) {
-    sort.addEventListener('change', (e) => renderMessages(search?.value || '', e.target.value));
+  emojiButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const state = getPairingState();
+      if (!state.linked) {
+        showToast('Vous devez d\'abord lier votre compte à votre partenaire.');
+        return;
+      }
+      if (composer) {
+        composer.value += button.dataset.emoji || '';
+        composer.focus();
+      }
+    });
+  });
+
+  filterButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      activeMessageView = button.dataset.view || 'all';
+      filterButtons.forEach(item => item.classList.toggle('active', item === button));
+      renderMessages(search?.value || '');
+    });
+  });
+
+  if (thread) {
+    thread.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-action]');
+      if (!button) return;
+      const { action, messageId, reaction } = button.dataset;
+      handleMessageAction(action, messageId, reaction);
+    });
   }
 
+  if (inviteButton) {
+    inviteButton.addEventListener('click', async () => {
+      const state = savePairingState({ linked: false, partnerCode: '', linkedAt: null });
+      const code = state.myCode;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(code);
+          showToast('Code d’invitation copié');
+        } else {
+          showToast('Code d’invitation prêt à partager');
+        }
+      } catch (error) {
+        showToast('Code d’invitation prêt à partager');
+      }
+      updateMessagesPairingUI();
+    });
+  }
+
+  if (joinTriggerButton) {
+    joinTriggerButton.addEventListener('click', () => {
+      if (pairingJoinSection) {
+        pairingJoinSection.hidden = !pairingJoinSection.hidden;
+      }
+      if (partnerCodeInput) {
+        partnerCodeInput.focus();
+      }
+    });
+  }
+
+  if (joinSubmitButton && partnerCodeInput) {
+    joinSubmitButton.addEventListener('click', () => {
+      const code = partnerCodeInput.value.trim().toUpperCase();
+      const currentState = getPairingState();
+      const validCodePattern = /^CARNET-[A-Z0-9]{6}$/;
+
+      if (!code) {
+        showToast('Saisissez un code valide.');
+        return;
+      }
+
+      if (!validCodePattern.test(code)) {
+        showToast('Code invalide. Vérifiez le format.');
+        return;
+      }
+
+      if (code === currentState.myCode.toUpperCase()) {
+        showToast('Entrez le code fourni par votre partenaire.');
+        return;
+      }
+
+      savePairingState({ linked: true, partnerCode: code, linkedAt: new Date().toISOString() });
+      updateMessagesPairingUI();
+      showToast('Liaison établie avec votre partenaire.');
+    });
+  }
+
+  if (partnerCodeInput) {
+    partnerCodeInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        joinSubmitButton?.click();
+      }
+    });
+  }
+
+  window.addEventListener('storage', (event) => {
+    if (event.key === PAIRING_STORAGE_KEY) {
+      updateMessagesPairingUI();
+    }
+    if (event.key === STORAGE_KEYS.messages) {
+      renderMessages();
+      renderTimeline();
+      updateStats();
+    }
+    if (event.key === STORAGE_KEYS.messageSettings) {
+      applyMessageBackground();
+    }
+  });
+
+  const initialMessages = ensureDefaultMessages(getMessages());
+  if (JSON.stringify(getMessages()) !== JSON.stringify(initialMessages)) {
+    saveMessages(initialMessages);
+  }
+  initMessageProfilePhotos();
+  updateComposerState();
+  updateMessageHeader();
+  applyMessageBackground();
+  updateMessagesPairingUI();
   renderMessages();
 }
 
@@ -1303,6 +1994,7 @@ function initBackup() {
         memories: getMemories(),
         gallery: getGallery(),
         messages: getMessages(),
+        messageSettings: getMessageSettings(),
         dates: getDates(),
         goals: getGoals(),
         challenge: load(STORAGE_KEYS.challenge, null),
@@ -1334,6 +2026,7 @@ function initBackup() {
         if (payload.memories) save(STORAGE_KEYS.memories, payload.memories);
         if (payload.gallery) save(STORAGE_KEYS.gallery, payload.gallery);
         if (payload.messages) save(STORAGE_KEYS.messages, payload.messages);
+        if (payload.messageSettings) save(STORAGE_KEYS.messageSettings, payload.messageSettings);
         if (payload.dates) save(STORAGE_KEYS.dates, payload.dates);
         if (payload.goals) save(STORAGE_KEYS.goals, payload.goals);
         if (payload.challenge) save(STORAGE_KEYS.challenge, payload.challenge);
@@ -1414,6 +2107,7 @@ function renderCoupleInfo(settings) {
   const onboardingPreview = document.querySelector('#onboardingPhotoPreview img');
   if (onboardingPreview) onboardingPreview.src = photo1 || DEFAULT_SETTINGS.photo1;
   updateCounter(settings.startDate);
+  updateMessageHeader();
 }
 
 function openOnboardingModal() {
