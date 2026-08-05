@@ -1074,14 +1074,14 @@ function normalizeMessage(message, index = 0) {
 }
 
 function getMessages() {
-  const stored = load(STORAGE_KEYS.messages, []);
-  const items = Array.isArray(stored) ? stored : (stored && Array.isArray(stored.messages) ? stored.messages : []);
-  return items.map((message, index) => normalizeMessage(message, index));
+  if (window.MessageModule && typeof window.MessageModule.getMessages === 'function') {
+    return window.MessageModule.getMessages();
+  }
+  return [];
 }
 
 function saveMessages(messages) {
   const normalized = messages.map((message, index) => normalizeMessage(message, index));
-  save(STORAGE_KEYS.messages, normalized);
   renderMessages();
   renderTimeline();
   updateStats();
@@ -1241,7 +1241,7 @@ function createMessagePayload(text, type = 'text', metadata = null, replyId = nu
   };
 }
 
-function handleMessageAction(action, messageId, reaction = null) {
+async function handleMessageAction(action, messageId, reaction = null) {
   const messages = getMessages();
   const target = messages.find(message => message.id === messageId);
   if (!target) return;
@@ -1279,37 +1279,59 @@ function handleMessageAction(action, messageId, reaction = null) {
   }
 
   if (action === 'pin') {
-    target.pinned = !target.pinned;
-    saveMessages(messages);
-    showToast(target.pinned ? 'Message épinglé' : 'Message désépinglé');
+    const next = { pinned: !target.pinned };
+    if (window.MessageModule && window.MessageModule.getState && window.MessageModule.getState().ready) {
+      await window.MessageModule.updateMessage(messageId, next);
+    } else {
+      target.pinned = !target.pinned;
+      saveMessages(messages);
+    }
+    showToast(next.pinned ? 'Message épinglé' : 'Message désépinglé');
     return;
   }
 
   if (action === 'favorite') {
-    target.favorite = !target.favorite;
-    saveMessages(messages);
-    showToast(target.favorite ? 'Ajouté aux favoris' : 'Retiré des favoris');
+    const next = { favorite: !target.favorite };
+    if (window.MessageModule && window.MessageModule.getState && window.MessageModule.getState().ready) {
+      await window.MessageModule.updateMessage(messageId, next);
+    } else {
+      target.favorite = !target.favorite;
+      saveMessages(messages);
+    }
+    showToast(next.favorite ? 'Ajouté aux favoris' : 'Retiré des favoris');
     return;
   }
 
   if (action === 'react') {
     const selectedReaction = reaction || '❤️';
-    target.reactions[selectedReaction] = (target.reactions[selectedReaction] || 0) + 1;
-    saveMessages(messages);
+    if (window.MessageModule && window.MessageModule.getState && window.MessageModule.getState().ready) {
+      await window.MessageModule.addReaction(messageId, selectedReaction);
+    } else {
+      target.reactions[selectedReaction] = (target.reactions[selectedReaction] || 0) + 1;
+      saveMessages(messages);
+    }
     showToast(`Réaction ${selectedReaction} ajoutée`);
     return;
   }
 
   if (action === 'delete-for-me') {
-    target.deletedForMe = true;
-    saveMessages(messages);
+    if (window.MessageModule && window.MessageModule.getState && window.MessageModule.getState().ready) {
+      await window.MessageModule.deleteMessage(messageId, false);
+    } else {
+      target.deletedForMe = true;
+      saveMessages(messages);
+    }
     showToast('Supprimé pour vous');
     return;
   }
 
   if (action === 'delete-for-everyone') {
-    target.deletedForEveryone = true;
-    saveMessages(messages);
+    if (window.MessageModule && window.MessageModule.getState && window.MessageModule.getState().ready) {
+      await window.MessageModule.deleteMessage(messageId, true);
+    } else {
+      target.deletedForEveryone = true;
+      saveMessages(messages);
+    }
     showToast('Supprimé pour tout le monde');
   }
 }
@@ -1329,48 +1351,69 @@ function triggerMessageHeartBurst() {
   setTimeout(() => { burst.innerHTML = ''; }, 900);
 }
 
-function sendTextMessage(text) {
+async function sendTextMessage(text) {
   if (!text.trim()) return;
 
-  const messages = getMessages();
+  const composer = document.getElementById('messageComposer');
+  const trimmed = text.trim();
+
   if (activeEditMessageId) {
+    const messages = getMessages();
     const target = messages.find(message => message.id === activeEditMessageId);
     if (target) {
-      target.text = text.trim();
+      target.text = trimmed;
       target.edited = true;
       target.time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-      saveMessages(messages);
+      if (window.MessageModule && window.MessageModule.getState && window.MessageModule.getState().ready) {
+        await window.MessageModule.updateMessage(activeEditMessageId, {
+          text: target.text,
+          edited: true,
+          time: target.time
+        });
+      } else {
+        saveMessages(getMessages());
+      }
       showToast('Message modifié ✨');
     }
     activeEditMessageId = null;
   } else {
-    messages.push(createMessagePayload(text.trim(), 'text', null, activeReplyMessageId));
-    saveMessages(messages);
+    if (window.MessageModule && window.MessageModule.getState && window.MessageModule.getState().ready) {
+      try {
+        await window.MessageModule.sendTextMessage(trimmed, activeReplyMessageId);
+      } catch (error) {
+        console.warn('sendTextMessage error', error);
+      }
+    } else {
+      const messages = getMessages();
+      messages.push(createMessagePayload(trimmed, 'text', null, activeReplyMessageId));
+      saveMessages(messages);
+    }
     showToast('Message envoyé ✨');
   }
 
   triggerMessageHeartBurst();
   activeReplyMessageId = null;
-  const composer = document.getElementById('messageComposer');
   if (composer) composer.value = '';
   updateComposerState();
 
   if (!activeEditMessageId) {
-    setTypingIndicator(true);
-    clearTimeout(messageTypingTimer);
-    messageTypingTimer = setTimeout(() => {
-      const replyText = text.trim().toLowerCase().includes('bonjour') || text.trim().toLowerCase().includes('salut')
-        ? 'Je suis là mon cœur 💕'
-        : 'J’aime ce que tu dis, continue 💖';
-      const replyMessage = createMessagePayload(replyText, 'text', null, null);
-      replyMessage.sender = 'partner';
-      replyMessage.author = 'Votre moitié';
-      replyMessage.status = 'delivered';
-      const items = getMessages();
-      items.push(replyMessage);
-      saveMessages(items);
-      setTypingIndicator(false);
-    }, 1200);
+    if (!window.MessageModule || !window.MessageModule.getState || !window.MessageModule.getState().ready) {
+      setTypingIndicator(true);
+      clearTimeout(messageTypingTimer);
+      messageTypingTimer = setTimeout(() => {
+        const replyText = trimmed.toLowerCase().includes('bonjour') || trimmed.toLowerCase().includes('salut')
+          ? 'Je suis là mon cœur 💕'
+          : 'J’aime ce que tu dis, continue 💖';
+        const replyMessage = createMessagePayload(replyText, 'text', null, null);
+        replyMessage.sender = 'partner';
+        replyMessage.author = 'Votre moitié';
+        replyMessage.status = 'delivered';
+        const items = getMessages();
+        items.push(replyMessage);
+        saveMessages(items);
+        setTypingIndicator(false);
+      }, 1200);
+    }
   }
 }
 
@@ -1437,15 +1480,19 @@ function ensureDefaultMessages(messages) {
   return initialMessages;
 }
 
-function deleteTimelineItem(id, type) {
+async function deleteTimelineItem(id, type) {
   if (!window.confirm('Supprimer cet élément de la chronologie ?')) return;
 
   if (type === 'Souvenir') {
     const memories = getMemories().filter(memory => memory.id !== id);
     saveMemories(memories);
   } else if (type === 'Message') {
-    const messages = getMessages().filter(message => message.id !== id);
-    saveMessages(messages);
+    if (window.MessageModule && window.MessageModule.getState && window.MessageModule.getState().ready) {
+      await window.MessageModule.deleteMessage(id, true);
+    } else {
+      const messages = getMessages().filter(message => message.id !== id);
+      saveMessages(messages);
+    }
   } else if (type === 'Événement') {
     const dates = getDates().filter(entry => entry.id !== id);
     saveDates(dates);
@@ -1787,7 +1834,7 @@ function initMessageProfilePhotos() {
   }
 }
 
-function initMessages() {
+async function initMessages() {
   const btn = document.getElementById('messageSendBtn');
   const search = document.getElementById('messageSearch');
   const composer = document.getElementById('messageComposer');
@@ -1801,14 +1848,19 @@ function initMessages() {
   const pairingJoinSection = document.getElementById('pairingJoinSection');
 
   if (btn) {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const state = getPairingState();
       if (!state.linked) {
         showToast('Vous devez d\'abord lier votre compte à votre partenaire.');
         return;
       }
       if (composer?.value.trim()) {
-        sendTextMessage(composer.value);
+        try {
+          await sendTextMessage(composer.value);
+        } catch (error) {
+          console.warn('Failed to send message', error);
+          showToast('Impossible d\'envoyer le message.');
+        }
       } else {
         composer?.focus();
       }
@@ -1816,7 +1868,7 @@ function initMessages() {
   }
 
   if (composer) {
-    composer.addEventListener('keydown', (event) => {
+    composer.addEventListener('keydown', async (event) => {
       const state = getPairingState();
       if (!state.linked) {
         event.preventDefault();
@@ -1825,7 +1877,12 @@ function initMessages() {
       }
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
-        sendTextMessage(composer.value);
+        try {
+          await sendTextMessage(composer.value);
+        } catch (error) {
+          console.warn('Failed to send message', error);
+          showToast('Impossible d\'envoyer le message.');
+        }
       }
     });
   }
@@ -1895,7 +1952,7 @@ function initMessages() {
   }
 
   if (joinSubmitButton && partnerCodeInput) {
-    joinSubmitButton.addEventListener('click', () => {
+    joinSubmitButton.addEventListener('click', async () => {
       const code = partnerCodeInput.value.trim().toUpperCase();
       const currentState = getPairingState();
       const validCodePattern = /^CARNET-[A-Z0-9]{6}$/;
@@ -1917,6 +1974,9 @@ function initMessages() {
 
       savePairingState({ linked: true, partnerCode: code, linkedAt: new Date().toISOString() });
       updateMessagesPairingUI();
+      if (window.MessageModule && typeof window.MessageModule.initialize === 'function') {
+        await window.MessageModule.initialize();
+      }
       showToast('Liaison établie avec votre partenaire.');
     });
   }
@@ -1930,29 +1990,36 @@ function initMessages() {
     });
   }
 
-  window.addEventListener('storage', (event) => {
+  window.addEventListener('storage', async (event) => {
     if (event.key === PAIRING_STORAGE_KEY) {
       updateMessagesPairingUI();
-    }
-    if (event.key === STORAGE_KEYS.messages) {
-      renderMessages();
-      renderTimeline();
-      updateStats();
+      if (window.MessageModule && typeof window.MessageModule.initialize === 'function') {
+        await window.MessageModule.initialize();
+      }
     }
     if (event.key === STORAGE_KEYS.messageSettings) {
       applyMessageBackground();
     }
   });
 
-  const initialMessages = ensureDefaultMessages(getMessages());
-  if (JSON.stringify(getMessages()) !== JSON.stringify(initialMessages)) {
-    saveMessages(initialMessages);
-  }
   initMessageProfilePhotos();
   updateComposerState();
   updateMessageHeader();
   applyMessageBackground();
   updateMessagesPairingUI();
+
+  if (window.MessageModule && typeof window.MessageModule.initialize === 'function') {
+    await window.MessageModule.initialize();
+  }
+
+  if (window.MessageModule && typeof window.MessageModule.onMessagesUpdated === 'function') {
+    window.MessageModule.onMessagesUpdated(() => {
+      renderMessages();
+      renderTimeline();
+      updateStats();
+    });
+  }
+
   renderMessages();
 }
 
@@ -3225,7 +3292,7 @@ function formatDate(dateStr) {
 
 /* ===== Init ===== */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   initSettings();
   initEditableFields();
@@ -3236,7 +3303,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initOnboarding();
   initMemories();
   initGallery();
-  initMessages();
+  await initMessages();
   initDates();
   initGoals();
   initPlaces();
