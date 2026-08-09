@@ -1958,26 +1958,71 @@ async function initMessages() {
       const validCodePattern = /^CARNET-[A-Z0-9]{6}$/;
 
       if (!code) {
+        console.warn('⚠️  No code entered');
         showToast('Saisissez un code valide.');
         return;
       }
 
       if (!validCodePattern.test(code)) {
+        console.warn('⚠️  Invalid code format:', code);
         showToast('Code invalide. Vérifiez le format.');
         return;
       }
 
       if (code === currentState.myCode.toUpperCase()) {
+        console.warn('⚠️  User entered their own code');
         showToast('Entrez le code fourni par votre partenaire.');
         return;
       }
 
-      savePairingState({ linked: true, partnerCode: code, linkedAt: new Date().toISOString() });
-      updateMessagesPairingUI();
-      if (window.MessageModule && typeof window.MessageModule.initialize === 'function') {
-        await window.MessageModule.initialize();
+      // Validate with Supabase
+      console.log('🔍 Validating code with Supabase:', code);
+      const conversationCode = [currentState.myCode, code]
+        .map(c => c.trim().toUpperCase())
+        .sort()
+        .join('::');
+
+      try {
+        // Check if conversation exists (Partner A created it)
+        if (!window.supabaseClient) {
+          console.error('❌ Supabase client not available');
+          showToast('Erreur: Supabase indisponible');
+          return;
+        }
+
+        const { data: conversation, error: selectError } = await window.supabaseClient
+          .from('conversations')
+          .select('*')
+          .eq('code', conversationCode)
+          .limit(1)
+          .maybeSingle();
+
+        if (selectError) {
+          console.error('❌ Supabase validation error:', selectError.message);
+          showToast('Erreur lors de la validation du code');
+          return;
+        }
+
+        if (!conversation) {
+          console.error('❌ Conversation not found. Partner A must create their profile first');
+          showToast('Code invalide. Votre partenaire doit créer son profil en premier.');
+          return;
+        }
+
+        console.log('✅ Code validated successfully in Supabase');
+        savePairingState({ linked: true, partnerCode: code, linkedAt: new Date().toISOString() });
+        updateMessagesPairingUI();
+        
+        if (window.MessageModule && typeof window.MessageModule.initialize === 'function') {
+          await window.MessageModule.initialize();
+        }
+        
+        showToast('✅ Liaison établie avec votre partenaire!');
+        partnerCodeInput.value = '';  // Clear input after success
+      } catch (error) {
+        console.error('❌ Linking error:', error);
+        showToast('Erreur lors de la liaison');
       }
-      showToast('Liaison établie avec votre partenaire.');
     });
   }
 

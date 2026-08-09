@@ -76,7 +76,10 @@
   }
 
   async function ensureConversation() {
-    if (!window.supabaseClient || !state.conversationCode) return null;
+    if (!window.supabaseClient || !state.conversationCode) {
+      console.error('❌ ensureConversation: Supabase client or conversation code missing');
+      return null;
+    }
 
     const { data: existing, error: selectError } = await window.supabaseClient
       .from('conversations')
@@ -86,13 +89,16 @@
       .maybeSingle();
 
     if (selectError) {
-      console.warn('Supabase select conversation error', selectError.message);
+      console.error('❌ Supabase select conversation error:', selectError.message);
+      return null;
     }
 
     if (existing) {
+      console.log('✅ Conversation found:', state.conversationCode);
       return existing;
     }
 
+    console.log('📝 Creating new conversation:', state.conversationCode);
     const insertRow = { code: state.conversationCode };
     if (Array.isArray([state.myCode, state.partnerCode])) {
       insertRow.participant_codes = [state.myCode, state.partnerCode];
@@ -105,22 +111,24 @@
       .single();
 
     if (insertError) {
-      if (!insertError.message?.includes('participant_codes')) {
-        console.warn('Supabase create conversation error', insertError.message);
-      }
+      console.error('❌ Supabase create conversation error:', insertError.message);
+      return null;
     }
 
+    console.log('✅ Conversation created successfully');
     return data || existing || null;
   }
 
   async function loadMessages() {
     if (!window.supabaseClient || !state.conversationCode) {
+      console.warn('⚠️  loadMessages: Supabase client or conversation code missing');
       state.messages = [];
       state.ready = true;
       notifyListeners();
       return;
     }
 
+    console.log('📥 Loading messages for conversation:', state.conversationCode);
     const { data, error } = await window.supabaseClient
       .from('messages')
       .select('*')
@@ -128,7 +136,7 @@
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.warn('Supabase load messages error', error.message);
+      console.error('❌ Supabase load messages error:', error.message);
       state.messages = [];
       state.ready = true;
       notifyListeners();
@@ -136,6 +144,7 @@
     }
 
     state.messages = (data || []).map(mapDbRowToMessage);
+    console.log(`✅ Loaded ${state.messages.length} messages`);
     state.ready = true;
     notifyListeners();
     await markPartnerMessagesRead();
@@ -154,7 +163,11 @@
   }
 
   async function subscribeRealtime() {
-    if (!window.RealtimeModule || !state.conversationCode) return;
+    if (!window.RealtimeModule || !state.conversationCode) {
+      console.warn('⚠️  subscribeRealtime: RealtimeModule or conversation code missing');
+      return;
+    }
+    console.log('📡 Subscribing to Realtime for conversation:', state.conversationCode);
     await window.RealtimeModule.subscribeToConversation(state.conversationCode, handleRealtimeEvent);
   }
 
@@ -190,9 +203,12 @@
 
   async function sendTextMessage(text, replyId = null) {
     if (!text || !window.supabaseClient || !state.conversationCode) {
-      throw new Error('MessageModule is not ready or missing conversation.');
+      const err = 'MessageModule is not ready or missing conversation.';
+      console.error('❌', err);
+      throw new Error(err);
     }
 
+    console.log('📤 Sending message to conversation:', state.conversationCode);
     const createdAt = Date.now();
     const message = window.createMessagePayload(text, 'text', null, replyId);
     message.createdAt = createdAt;
@@ -206,7 +222,7 @@
       .single();
 
     if (error) {
-      console.warn('Supabase insert message error', error.message);
+      console.error('❌ Supabase insert message error:', error.message);
       throw error;
     }
 
@@ -219,6 +235,7 @@
       state.messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     }
 
+    console.log('✅ Message sent successfully');
     notifyListeners();
     return savedMessage;
   }
@@ -303,6 +320,7 @@
   async function initialize() {
     const pairing = getPairingState();
     if (!pairing || !pairing.linked || !pairing.partnerCode) {
+      console.warn('⚠️  MessageModule: Pairing not linked. Waiting for pairing...');
       state.messages = [];
       state.ready = true;
       notifyListeners();
@@ -313,9 +331,21 @@
     state.partnerCode = pairing.partnerCode;
     state.conversationCode = createConversationCode(state.myCode, state.partnerCode);
 
-    await ensureConversation();
-    await loadMessages();
-    await subscribeRealtime();
+    console.log('🔗 MessageModule initialized:');
+    console.log('  - My Code:', state.myCode);
+    console.log('  - Partner Code:', state.partnerCode);
+    console.log('  - Conversation Code:', state.conversationCode);
+
+    try {
+      await ensureConversation();
+      await loadMessages();
+      await subscribeRealtime();
+      console.log('✅ MessageModule ready for messaging');
+    } catch (error) {
+      console.error('❌ MessageModule initialization failed:', error);
+      state.ready = true;
+      notifyListeners();
+    }
   }
 
   window.MessageModule = {
