@@ -501,6 +501,22 @@ const GAME_CATEGORIES = {
 
 const GAME_STORAGE_KEY = STORAGE_KEYS.gameState;
 const GAME_HISTORY_LIMIT = 20;
+const GAME_LOVE_MESSAGES = [
+  'À travers chaque saison, c’est encore vers toi que mon cœur choisit de revenir.',
+  'Les plus beaux instants ne sont pas parfaits : ils deviennent précieux parce qu’on les partage.',
+  'Dans le calme comme dans les éclats de rire, ta présence est l’un de mes plus beaux refuges.',
+  'Notre histoire se construit dans ces petits gestes qui disent doucement : je suis là, avec toi.',
+  'Je nous souhaite encore mille souvenirs, et cette même tendresse pour les accueillir.',
+  'À tes côtés, même les journées ordinaires prennent une place particulière dans mon cœur.',
+  'Ce qui nous unit grandit chaque fois qu’on s’écoute, qu’on se choisit et qu’on avance ensemble.',
+  'Ton sourire a cette façon unique de rendre le monde un peu plus doux.',
+  'Aimer, c’est découvrir encore et encore la beauté de la personne qui est près de soi.',
+  'Merci d’être cette personne avec qui le silence, les rêves et les fous rires ont leur place.',
+  'Parmi tous les chemins possibles, je suis heureux·se que le nôtre se poursuive côte à côte.',
+  'Que ce petit défi devienne une nouvelle occasion de se rapprocher et de se faire du bien.'
+];
+let activeGameSpin = false;
+let lastGameLoveMessage = '';
 
 function getGameState() {
   return load(GAME_STORAGE_KEY, { category: 'romantique', history: [], recent: [] });
@@ -514,16 +530,18 @@ function getGamePool(category) {
   return GAME_CATEGORIES[category] || GAME_CATEGORIES.romantique;
 }
 
-function pickGameItem(category) {
+function pickGameItem(category, isAction) {
   const pool = getGamePool(category);
   const state = getGameState();
   const recent = state.recent || [];
-  const available = pool.actions.concat(pool.truths).filter(item => !recent.includes(item));
-  const source = available.length ? available : pool.actions.concat(pool.truths);
+  const items = isAction ? pool.actions : pool.truths;
+  const available = items.filter(item => !recent.includes(item));
+  const source = available.length ? available : items;
   return source[Math.floor(Math.random() * source.length)];
 }
 
 function createConfettiBurst() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const shell = document.querySelector('.game-shell');
   if (!shell) return;
 
@@ -546,44 +564,90 @@ function createConfettiBurst() {
   setTimeout(() => burst.remove(), 1400);
 }
 
-function spinWheel(category) {
+function getGameLoveMessage() {
+  const available = GAME_LOVE_MESSAGES.filter(message => message !== lastGameLoveMessage);
+  const message = available[Math.floor(Math.random() * available.length)] || GAME_LOVE_MESSAGES[0];
+  lastGameLoveMessage = message;
+  return message;
+}
+
+function createWheelSparkles(wrapper) {
+  const layer = document.createElement('div');
+  layer.className = 'wheel-sparkles';
+  layer.setAttribute('aria-hidden', 'true');
+
+  for (let i = 0; i < 14; i += 1) {
+    const sparkle = document.createElement('span');
+    sparkle.className = 'wheel-sparkle';
+    sparkle.textContent = i % 3 === 0 ? '✦' : '·';
+    sparkle.style.setProperty('--spark-angle', `${Math.random() * 360}deg`);
+    sparkle.style.setProperty('--spark-distance', `${42 + Math.random() * 52}px`);
+    sparkle.style.animationDelay = `${Math.random() * 180}ms`;
+    layer.appendChild(sparkle);
+  }
+
+  wrapper.appendChild(layer);
+  window.setTimeout(() => layer.remove(), 1300);
+}
+
+function spinWheel(category, direction = 1) {
+  if (activeGameSpin) return;
   const wheel = document.getElementById('gameWheel');
   const wrapper = document.getElementById('wheelWrapper');
   const resultCard = document.getElementById('gameResultCard');
   const resultBadge = document.getElementById('gameResultBadge');
   const resultTitle = document.getElementById('gameResultTitle');
+  const resultLove = document.getElementById('gameResultLove');
   const resultText = document.getElementById('gameResultText');
   const resultCategory = document.getElementById('gameResultCategory');
   const status = document.getElementById('gameStatus');
   const selectedLabel = document.getElementById('selectedCategoryLabel');
   const spinButton = document.getElementById('spinGameBtn');
+  const categoryButtons = document.querySelectorAll('.category-btn');
+  if (!wheel || !wrapper || !resultCard || !spinButton) return;
+
   const state = getGameState();
   const pool = getGamePool(category);
   const isAction = Math.random() > 0.5;
-  const spinTurns = 6 + Math.floor(Math.random() * 3);
-  const randomOffset = Math.floor(Math.random() * 360);
+  const chosen = pickGameItem(category, isAction);
+  const segmentIndexes = isAction ? [0, 2, 4, 6] : [1, 3, 5, 7];
+  const targetSegment = segmentIndexes[Math.floor(Math.random() * segmentIndexes.length)];
+  const segmentCenter = targetSegment * 45 + 22.5;
+  const desiredRotation = (360 - segmentCenter + 360) % 360;
   const baseRotation = parseFloat(wheel.dataset.rotation || '0');
-  const targetRotation = baseRotation + spinTurns * 360 + randomOffset;
+  const normalizedBase = ((baseRotation % 360) + 360) % 360;
+  const spinDirection = direction < 0 ? -1 : 1;
+  const alignmentDelta = spinDirection > 0
+    ? (desiredRotation - normalizedBase + 360) % 360
+    : -((normalizedBase - desiredRotation + 360) % 360);
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const spinTurns = reducedMotion ? 1 : 4 + Math.floor(Math.random() * 3);
+  const spinDuration = reducedMotion ? 240 : 3300 + (spinTurns - 4) * 180;
+  const targetRotation = baseRotation + spinDirection * spinTurns * 360 + alignmentDelta;
 
+  activeGameSpin = true;
   wheel.dataset.rotation = String(targetRotation);
+  wheel.style.setProperty('--wheel-spin-duration', `${spinDuration}ms`);
   wheel.style.transform = `rotate(${targetRotation}deg)`;
   wrapper.classList.add('is-spinning');
   wheel.classList.add('is-spinning');
+  categoryButtons.forEach(button => { button.disabled = true; });
   resultCard.hidden = true;
   status.innerHTML = 'Roulette en mouvement…';
   spinButton.disabled = true;
   spinButton.textContent = '✨ Roue en mouvement…';
+  createWheelSparkles(wrapper);
+  if (!reducedMotion) {
+    window.setTimeout(() => {
+      if (activeGameSpin) createWheelSparkles(wrapper);
+    }, Math.round(spinDuration * 0.62));
+  }
 
-  setTimeout(() => {
-    const chosen = isAction
-      ? pool.actions[Math.floor(Math.random() * pool.actions.length)]
-      : pool.truths[Math.floor(Math.random() * pool.truths.length)];
-
+  window.setTimeout(() => {
     const recent = state.recent || [];
     const updatedRecent = [chosen, ...recent].slice(0, GAME_HISTORY_LIMIT);
     state.recent = updatedRecent;
     saveGameState(state);
-    renderGameHistory();
 
     wrapper.classList.remove('is-spinning');
     wheel.classList.remove('is-spinning');
@@ -591,6 +655,7 @@ function spinWheel(category) {
 
     resultBadge.textContent = isAction ? '❤️ Action' : '💬 Vérité';
     resultTitle.textContent = isAction ? 'Action choisie' : 'Vérité choisie';
+    if (resultLove) resultLove.textContent = getGameLoveMessage();
     resultText.textContent = chosen;
     resultCategory.textContent = pool.label;
     selectedLabel.textContent = pool.label;
@@ -599,74 +664,34 @@ function spinWheel(category) {
     resultCard.classList.remove('show');
     void resultCard.offsetWidth;
     resultCard.classList.add('show');
+    activeGameSpin = false;
+    categoryButtons.forEach(button => { button.disabled = false; });
     spinButton.disabled = false;
     spinButton.textContent = '❤️ FAIRE TOURNER';
-  }, 6200);
-}
-
-function showGameHistoryToast(message) {
-  const toast = document.getElementById('gameHistoryToast');
-  if (!toast) return;
-  toast.textContent = message;
-  toast.hidden = false;
-  toast.classList.add('show');
-  clearTimeout(showGameHistoryToast.timeoutId);
-  showGameHistoryToast.timeoutId = setTimeout(() => {
-    toast.classList.remove('show');
-    toast.hidden = true;
-  }, 2200);
-}
-
-function clearGameHistory() {
-  const list = document.getElementById('gameHistoryList');
-  if (!list) return;
-
-  const confirmed = window.confirm('Êtes-vous sûr de vouloir supprimer tout l\'historique du jeu ? Cette action est irréversible.');
-  if (!confirmed) return;
-
-  const items = Array.from(list.querySelectorAll('li'));
-  list.classList.add('is-clearing');
-  items.forEach((item, index) => {
-    item.classList.add('is-removing');
-    item.style.transitionDelay = `${index * 40}ms`;
-  });
-
-  setTimeout(() => {
-    const state = getGameState();
-    state.recent = [];
-    saveGameState(state);
-    renderGameHistory();
-    list.classList.remove('is-clearing');
-    showGameHistoryToast('✅ Historique supprimé avec succès.');
-  }, 260);
+  }, spinDuration + 80);
 }
 
 function renderGameHistory() {
   const list = document.getElementById('gameHistoryList');
+  if (!list) return;
+
   const state = getGameState();
   const items = (state.recent || []).slice(0, GAME_HISTORY_LIMIT);
-  list.innerHTML = '';
-
-  if (items.length === 0) {
-    const li = document.createElement('li');
-    li.textContent = 'Aucune action ou vérité proposée pour le moment.';
-    list.appendChild(li);
-    return;
-  }
-
-  items.forEach(item => {
-    const li = document.createElement('li');
-    li.textContent = item;
-    list.appendChild(li);
-  });
+  list.replaceChildren(...items.map(item => {
+    const entry = document.createElement('li');
+    entry.textContent = item;
+    return entry;
+  }));
 }
 
 function initGame() {
   const categoryButtons = document.querySelectorAll('.category-btn');
   const spinButton = document.getElementById('spinGameBtn');
-  const clearHistoryButton = document.getElementById('clearGameHistoryBtn');
   const selectedLabel = document.getElementById('selectedCategoryLabel');
+  const wheel = document.getElementById('gameWheel');
+  const wrapper = document.getElementById('wheelWrapper');
   let currentCategory = 'romantique';
+  let dragState = null;
 
   categoryButtons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -682,11 +707,62 @@ function initGame() {
     spinWheel(currentCategory);
   });
 
-  if (clearHistoryButton) {
-    clearHistoryButton.addEventListener('click', clearGameHistory);
-  }
+  wheel.addEventListener('pointerdown', event => {
+    if (activeGameSpin || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    if (event.target.closest('.wheel-center')) return;
+    const bounds = wheel.getBoundingClientRect();
+    const centerX = bounds.left + bounds.width / 2;
+    const centerY = bounds.top + bounds.height / 2;
+    const startAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX) * 180 / Math.PI;
+    const startRadius = Math.hypot(event.clientX - centerX, event.clientY - centerY);
+    const diameter = wheel.offsetWidth;
+    if (startRadius < diameter * 0.24 || startRadius > diameter * 0.52) return;
 
-  renderGameHistory();
+    dragState = {
+      pointerId: event.pointerId,
+      centerX,
+      centerY,
+      lastAngle: startAngle,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      delta: 0,
+      distance: 0,
+      startRadius,
+      maxRadiusDeviation: 0
+    };
+    wheel.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  wheel.addEventListener('pointermove', event => {
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    const angle = Math.atan2(event.clientY - dragState.centerY, event.clientX - dragState.centerX) * 180 / Math.PI;
+    let delta = angle - dragState.lastAngle;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    dragState.delta += delta;
+    dragState.lastAngle = angle;
+    dragState.distance += Math.hypot(event.clientX - dragState.lastX, event.clientY - dragState.lastY);
+    const radius = Math.hypot(event.clientX - dragState.centerX, event.clientY - dragState.centerY);
+    dragState.maxRadiusDeviation = Math.max(dragState.maxRadiusDeviation, Math.abs(radius - dragState.startRadius));
+    dragState.lastX = event.clientX;
+    dragState.lastY = event.clientY;
+  });
+
+  const endWheelDrag = event => {
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    const { delta, distance, maxRadiusDeviation } = dragState;
+    dragState = null;
+    if (Math.abs(delta) >= 42 && distance >= 40 && maxRadiusDeviation <= wheel.offsetWidth * 0.12) {
+      spinWheel(currentCategory, Math.sign(delta));
+    } else if (distance <= 8) {
+      spinWheel(currentCategory);
+    }
+  };
+  wheel.addEventListener('pointerup', endWheelDrag);
+  wheel.addEventListener('pointercancel', event => {
+    if (dragState?.pointerId === event.pointerId) dragState = null;
+  });
 }
 
 const CHALLENGES = [
@@ -851,6 +927,7 @@ let activeReplyMessageId = null;
 let activeEditMessageId = null;
 let messageTypingTimer = null;
 let activeMessageView = 'all';
+let isSendingMessage = false;
 
 function getMessageSettings() {
   return load(STORAGE_KEYS.messageSettings || 'carnet_message_settings', { background: 'sunset' });
@@ -886,12 +963,15 @@ function updateMessageHeader() {
   const subtitle = document.getElementById('messagesStatusText');
   const avatarPrimary = document.getElementById('messageAvatarPrimary');
   const avatarSecondary = document.getElementById('messageAvatarSecondary');
+  const partnerName = document.getElementById('messagesPartnerName');
+  const partnerAvatar = document.getElementById('messagePartnerAvatar');
   const settings = getSettings();
   const state = getMessageHeaderState();
   const firstName1 = settings.firstName1 || state.firstName1 || DEFAULT_SETTINGS.firstName1;
   const firstName2 = settings.firstName2 || state.firstName2 || DEFAULT_SETTINGS.firstName2;
   const nickname1 = settings.nickname1 || state.nickname1 || '';
   const nickname2 = settings.nickname2 || state.nickname2 || '';
+  const displayPartnerName = settings.showNicknames && nickname2 ? nickname2 : firstName2;
 
   if (title) {
     if (settings.showNicknames && (nickname1 || nickname2)) {
@@ -912,6 +992,14 @@ function updateMessageHeader() {
 
   if (avatarSecondary) {
     avatarSecondary.src = state.photo2 || settings.photo2 || settings.couplePhoto || DEFAULT_SETTINGS.photo2;
+  }
+
+  if (partnerName) {
+    partnerName.textContent = displayPartnerName;
+  }
+
+  if (partnerAvatar) {
+    partnerAvatar.src = state.photo2 || settings.photo2 || settings.couplePhoto || DEFAULT_SETTINGS.photo2;
   }
 
   saveMessageHeaderState({
@@ -982,7 +1070,11 @@ function updateMessagesPairingUI() {
   }
 
   if (pairingGate) {
-    pairingGate.hidden = isLinked;
+    pairingGate.hidden = true;
+  }
+
+  if (pairingBlock) {
+    pairingBlock.hidden = isLinked;
   }
 
   if (thread) {
@@ -990,12 +1082,12 @@ function updateMessagesPairingUI() {
   }
 
   if (composer) {
-    composer.disabled = !isLinked;
-    composer.placeholder = isLinked ? 'Écrivez un mot doux...' : 'Liaison requise';
+    composer.disabled = false;
+    composer.placeholder = activeEditMessageId ? composer.placeholder : 'Message';
   }
 
   if (sendButton) {
-    sendButton.disabled = !isLinked;
+    sendButton.disabled = false;
   }
 
   if (searchInput) {
@@ -1142,8 +1234,6 @@ function renderMessages(filter = '', sortValue = 'date_desc') {
       return haystack.includes(searchValue);
     })
     .sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
       return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
     });
 
@@ -1158,7 +1248,23 @@ function renderMessages(filter = '', sortValue = 'date_desc') {
 
   empty.hidden = true;
 
+  let previousDate = '';
   visible.forEach(message => {
+    const messageDate = new Date(message.createdAt || Date.now());
+    const dateKey = `${messageDate.getFullYear()}-${messageDate.getMonth()}-${messageDate.getDate()}`;
+    if (dateKey !== previousDate) {
+      const separator = document.createElement('div');
+      separator.className = 'message-date-separator';
+      separator.textContent = messageDate.toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+      list.appendChild(separator);
+      previousDate = dateKey;
+    }
+
     const bubble = document.createElement('article');
     bubble.className = `message-bubble ${message.sender === 'me' ? 'message-bubble--mine' : 'message-bubble--their'}${message.pinned ? ' is-pinned' : ''}${message.favorite ? ' is-favorite' : ''}`;
     bubble.dataset.messageId = message.id;
@@ -1166,21 +1272,34 @@ function renderMessages(filter = '', sortValue = 'date_desc') {
       .map(([emoji, count]) => `<button class="message-reaction-chip" type="button" data-action="react" data-reaction="${emoji}" data-message-id="${message.id}">${emoji} ${count}</button>`)
       .join('');
     const attachmentMarkup = getMessageContentMarkup(message, messages);
+    const readStatus = message.sender !== 'me'
+      ? ''
+      : message.status === 'read'
+        ? '<span aria-label="Lu">✓✓</span>'
+        : message.status === 'delivered'
+          ? '<span aria-label="Distribué">✓</span>'
+          : '<span aria-label="En attente">◷</span>';
     bubble.innerHTML = `
       <div class="message-bubble-header">
-        <span>${escapeHtml(getMessageDisplayName(message.sender))}</span>
-        <div class="message-bubble-actions">
-          <button class="message-action-btn" type="button" data-action="reply" data-message-id="${message.id}">↩</button>
-          <button class="message-action-btn" type="button" data-action="edit" data-message-id="${message.id}">✏️</button>
-          <button class="message-action-btn" type="button" data-action="pin" data-message-id="${message.id}">${message.pinned ? '📌' : '📍'}</button>
-          <button class="message-action-btn" type="button" data-action="favorite" data-message-id="${message.id}">${message.favorite ? '⭐' : '☆'}</button>
-          <button class="message-action-btn" type="button" data-action="delete-for-me" data-message-id="${message.id}">🗑️</button>
-        </div>
+        <span>${message.edited ? 'Modifié' : ''}</span>
+        <details class="message-more-actions">
+          <summary aria-label="Actions du message" title="Actions">•••</summary>
+          <div class="message-bubble-actions">
+            <button class="message-action-btn" type="button" data-action="reply" data-message-id="${message.id}">↩ Répondre</button>
+            <button class="message-action-btn" type="button" data-action="edit" data-message-id="${message.id}">✏️ Modifier</button>
+            <button class="message-action-btn" type="button" data-action="pin" data-message-id="${message.id}">${message.pinned ? '📌 Désépingler' : '📍 Épingler'}</button>
+            <button class="message-action-btn" type="button" data-action="favorite" data-message-id="${message.id}">${message.favorite ? '⭐ Retirer des favoris' : '☆ Ajouter aux favoris'}</button>
+            <button class="message-action-btn" type="button" data-action="delete-for-me" data-message-id="${message.id}">🗑️ Supprimer</button>
+            <div class="message-action-reactions" aria-label="Réagir au message">
+              ${['❤️', '😂', '😍', '👍'].map(emoji => `<button class="message-reaction-chip" type="button" data-action="react" data-reaction="${emoji}" data-message-id="${message.id}" aria-label="Réagir ${emoji}">${emoji}</button>`).join('')}
+            </div>
+          </div>
+        </details>
       </div>
       <div class="message-bubble-content">${attachmentMarkup}</div>
-      <div class="message-reactions">${reactions || '<button class="message-reaction-chip" type="button" data-action="react" data-reaction="❤️" data-message-id="${message.id}">❤️</button><button class="message-reaction-chip" type="button" data-action="react" data-reaction="😂" data-message-id="${message.id}">😂</button><button class="message-reaction-chip" type="button" data-action="react" data-reaction="😍" data-message-id="${message.id}">😍</button><button class="message-reaction-chip" type="button" data-action="react" data-reaction="👍" data-message-id="${message.id}">👍</button>'}</div>
+      <div class="message-reactions">${reactions}</div>
       <div class="message-bubble-footer">
-        <span>${message.edited ? '✏️ ' : ''}${message.sender === 'me' ? (message.status === 'read' ? '✓✓' : message.status === 'delivered' ? '✓' : '⏱') : ''}</span>
+        <span>${readStatus}</span>
         <span>${escapeHtml(message.time || '')}</span>
       </div>
     `;
@@ -1208,8 +1327,15 @@ function updateComposerState() {
     const target = getMessages().find(message => message.id === activeEditMessageId);
     composer.placeholder = `Modifier : ${target?.text || 'votre message'}`;
   } else if (composer) {
-    composer.placeholder = 'Écrivez un mot doux...';
+    composer.placeholder = 'Message';
   }
+
+  if (composer) resizeMessageComposer(composer);
+}
+
+function resizeMessageComposer(composer) {
+  composer.style.height = 'auto';
+  composer.style.height = `${Math.min(composer.scrollHeight, 140)}px`;
 }
 
 function setTypingIndicator(active, label = 'Thomas est en train d\'écrire...') {
@@ -1352,69 +1478,67 @@ function triggerMessageHeartBurst() {
 }
 
 async function sendTextMessage(text) {
-  if (!text.trim()) return;
+  const trimmed = text.trim();
+  if (!trimmed || isSendingMessage) return;
 
   const composer = document.getElementById('messageComposer');
-  const trimmed = text.trim();
+  const pairing = getPairingState();
+  if (!pairing.linked) {
+    showToast('Liez votre compte à votre partenaire pour envoyer des messages.');
+    return;
+  }
 
+  const messageModuleReady = window.MessageModule
+    && window.MessageModule.getState
+    && window.MessageModule.getState().ready;
+  if (!messageModuleReady || !window.supabaseClient) {
+    showToast('La messagerie n’est pas connectée. Votre message n’a pas été envoyé.');
+    return;
+  }
+
+  isSendingMessage = true;
+  const sendButton = document.getElementById('messageSendBtn');
+  if (sendButton) sendButton.disabled = true;
   if (activeEditMessageId) {
     const messages = getMessages();
     const target = messages.find(message => message.id === activeEditMessageId);
-    if (target) {
-      target.text = trimmed;
-      target.edited = true;
-      target.time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-      if (window.MessageModule && window.MessageModule.getState && window.MessageModule.getState().ready) {
-        await window.MessageModule.updateMessage(activeEditMessageId, {
-          text: target.text,
-          edited: true,
-          time: target.time
-        });
-      } else {
-        saveMessages(getMessages());
-      }
+    if (!target) {
+      isSendingMessage = false;
+      if (sendButton) sendButton.disabled = false;
+      showToast('Ce message n’est plus disponible.');
+      return;
+    }
+
+    try {
+      const updated = await window.MessageModule.updateMessage(activeEditMessageId, {
+        text: trimmed,
+        edited: true,
+        time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      });
+      if (!updated) throw new Error('Message update failed');
+      activeEditMessageId = null;
       showToast('Message modifié ✨');
+    } finally {
+      isSendingMessage = false;
+      if (sendButton) sendButton.disabled = false;
     }
-    activeEditMessageId = null;
   } else {
-    if (window.MessageModule && window.MessageModule.getState && window.MessageModule.getState().ready) {
-      try {
-        await window.MessageModule.sendTextMessage(trimmed, activeReplyMessageId);
-      } catch (error) {
-        console.warn('sendTextMessage error', error);
-      }
-    } else {
-      const messages = getMessages();
-      messages.push(createMessagePayload(trimmed, 'text', null, activeReplyMessageId));
-      saveMessages(messages);
+    try {
+      await window.MessageModule.sendTextMessage(trimmed, activeReplyMessageId);
+      showToast('Message envoyé ✨');
+    } finally {
+      isSendingMessage = false;
+      if (sendButton) sendButton.disabled = false;
     }
-    showToast('Message envoyé ✨');
   }
 
   triggerMessageHeartBurst();
   activeReplyMessageId = null;
-  if (composer) composer.value = '';
-  updateComposerState();
-
-  if (!activeEditMessageId) {
-    if (!window.MessageModule || !window.MessageModule.getState || !window.MessageModule.getState().ready) {
-      setTypingIndicator(true);
-      clearTimeout(messageTypingTimer);
-      messageTypingTimer = setTimeout(() => {
-        const replyText = trimmed.toLowerCase().includes('bonjour') || trimmed.toLowerCase().includes('salut')
-          ? 'Je suis là mon cœur 💕'
-          : 'J’aime ce que tu dis, continue 💖';
-        const replyMessage = createMessagePayload(replyText, 'text', null, null);
-        replyMessage.sender = 'partner';
-        replyMessage.author = 'Votre moitié';
-        replyMessage.status = 'delivered';
-        const items = getMessages();
-        items.push(replyMessage);
-        saveMessages(items);
-        setTypingIndicator(false);
-      }, 1200);
-    }
+  if (composer) {
+    composer.value = '';
+    resizeMessageComposer(composer);
   }
+  updateComposerState();
 }
 
 function readFileAsDataUrl(file) {
@@ -1847,6 +1971,10 @@ async function initMessages() {
   const partnerCodeInput = document.getElementById('partnerCodeInput');
   const pairingJoinSection = document.getElementById('pairingJoinSection');
 
+  document.getElementById('messagesBackBtn')?.addEventListener('click', () => {
+    document.querySelector('.nav-link[data-section="accueil"]')?.click();
+  });
+
   if (btn) {
     btn.addEventListener('click', async () => {
       const state = getPairingState();
@@ -1869,12 +1997,6 @@ async function initMessages() {
 
   if (composer) {
     composer.addEventListener('keydown', async (event) => {
-      const state = getPairingState();
-      if (!state.linked) {
-        event.preventDefault();
-        showToast('Vous devez d\'abord lier votre compte à votre partenaire.');
-        return;
-      }
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         try {
@@ -1885,7 +2007,20 @@ async function initMessages() {
         }
       }
     });
+    composer.addEventListener('input', () => resizeMessageComposer(composer));
+    composer.addEventListener('focus', () => {
+      requestAnimationFrame(() => composer.scrollIntoView({ block: 'nearest' }));
+    });
   }
+
+  const updateMessagesViewportHeight = () => {
+    if (window.visualViewport) {
+      document.documentElement.style.setProperty('--messages-visual-height', `${window.visualViewport.height}px`);
+    }
+  };
+  updateMessagesViewportHeight();
+  window.visualViewport?.addEventListener('resize', updateMessagesViewportHeight);
+  window.visualViewport?.addEventListener('scroll', updateMessagesViewportHeight);
 
   if (search) {
     search.addEventListener('input', (e) => renderMessages(e.target.value));
@@ -1893,15 +2028,12 @@ async function initMessages() {
 
   emojiButtons.forEach(button => {
     button.addEventListener('click', () => {
-      const state = getPairingState();
-      if (!state.linked) {
-        showToast('Vous devez d\'abord lier votre compte à votre partenaire.');
-        return;
-      }
       if (composer) {
         composer.value += button.dataset.emoji || '';
+        resizeMessageComposer(composer);
         composer.focus();
       }
+      button.closest('.message-emoji-picker')?.removeAttribute('open');
     });
   });
 
@@ -2294,7 +2426,6 @@ function populateSettingsForm(settings) {
   document.getElementById('firstName2').value = settings.firstName2 || '';
   document.getElementById('nickname1').value = settings.nickname1 || '';
   document.getElementById('nickname2').value = settings.nickname2 || '';
-  document.getElementById('settingsStartDate').value = settings.startDate || DEFAULT_SETTINGS.startDate;
   document.getElementById('showNicknames').checked = !!settings.showNicknames;
 
   settingsPhotoDataUrl1 = settings.photo1 || settings.couplePhoto || DEFAULT_SETTINGS.photo1;
@@ -2496,6 +2627,7 @@ function initNavigation() {
 
       sections.forEach(s => s.classList.remove('active'));
       document.getElementById(target).classList.add('active');
+      document.body.classList.toggle('messages-open', target === 'messages');
 
       navLinks.classList.remove('open');
       navToggle.setAttribute('aria-expanded', 'false');
@@ -2618,11 +2750,16 @@ function initTheme() {
 }
 
 function initSettingsForm() {
-  const form = document.getElementById('settingsForm');
+  const form = document.getElementById('profileForm');
+  const modal = document.getElementById('profileModal');
   const showNicknames = document.getElementById('showNicknames');
 
-  const themeMode = getThemeModePreference();
-  updateThemeControls(themeMode);
+  document.getElementById('editCoupleProfileBtn').addEventListener('click', () => {
+    populateSettingsForm(getSettings());
+    modal.hidden = false;
+  });
+  document.getElementById('closeProfileModal').addEventListener('click', () => { modal.hidden = true; });
+  document.getElementById('cancelProfileBtn').addEventListener('click', () => { modal.hidden = true; });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -2631,19 +2768,13 @@ function initSettingsForm() {
       firstName1: document.getElementById('firstName1').value.trim(),
       firstName2: document.getElementById('firstName2').value.trim(),
       nickname1: document.getElementById('nickname1').value.trim(),
-      nickname2: document.getElementById('nickname2').value.trim(),
-      startDate: document.getElementById('settingsStartDate').value,
-      photo1: settingsPhotoDataUrl1 || getSettings().photo1 || getSettings().couplePhoto || DEFAULT_SETTINGS.photo1,
-      photo2: settingsPhotoDataUrl2 || getSettings().photo2 || getSettings().couplePhoto || DEFAULT_SETTINGS.photo2,
-      couplePhoto: settingsPhotoDataUrl1 || settingsPhotoDataUrl2 || getSettings().couplePhoto || DEFAULT_SETTINGS.couplePhoto,
-      showNicknames: showNicknames.checked,
-      theme: document.getElementById('themeModeInput').value || getThemeModePreference()
+      nickname2: document.getElementById('nickname2').value.trim()
     };
 
     saveSettings(settings);
-    applyTheme(settings.theme, true, false);
     renderCoupleInfo(getSettings());
     populateSettingsForm(getSettings());
+    modal.hidden = true;
     showToast('Informations du couple mises à jour 💕');
   });
 
@@ -2809,6 +2940,7 @@ function renderGallery() {
   const empty = document.getElementById('galleryEmpty');
 
   grid.innerHTML = '';
+  renderFavoriteGallery(photos);
 
   if (photos.length === 0) {
     empty.hidden = false;
@@ -2817,43 +2949,106 @@ function renderGallery() {
 
   empty.hidden = true;
 
-  photos.forEach(photo => {
-    const item = document.createElement('div');
-    item.className = 'gallery-item';
-    item.dataset.id = photo.id;
-    item.innerHTML = `
-      <img src="${photo.src}" alt="Photo souvenir" loading="lazy">
-      <button class="gallery-delete-btn" type="button" data-delete-photo-id="${photo.id}" aria-label="Supprimer la photo">🗑️</button>
-    `;
-    item.addEventListener('click', (event) => {
-      if (event.target.closest('.gallery-delete-btn')) return;
-      openLightbox(photo.id);
-    });
+  photos.forEach(photo => grid.appendChild(createGalleryItem(photo, true)));
+}
 
-    const deleteBtn = item.querySelector('.gallery-delete-btn');
+function createGalleryItem(photo, showDelete = false) {
+  const item = document.createElement('article');
+  item.className = 'gallery-item';
+  item.dataset.id = photo.id;
+
+  const image = document.createElement('img');
+  image.src = photo.src;
+  image.alt = 'Photo souvenir';
+  image.loading = 'lazy';
+  item.appendChild(image);
+
+  const favoriteBtn = document.createElement('button');
+  favoriteBtn.className = `gallery-favorite-btn${photo.favorite ? ' is-favorite' : ''}`;
+  favoriteBtn.type = 'button';
+  favoriteBtn.textContent = photo.favorite ? '♥' : '♡';
+  favoriteBtn.setAttribute('aria-label', photo.favorite ? 'Retirer des souvenirs spéciaux' : 'Ajouter aux souvenirs spéciaux');
+  favoriteBtn.setAttribute('aria-pressed', photo.favorite ? 'true' : 'false');
+  favoriteBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    togglePhotoFavorite(photo.id);
+  });
+  item.appendChild(favoriteBtn);
+
+  if (showDelete) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'gallery-delete-btn';
+    deleteBtn.type = 'button';
+    deleteBtn.setAttribute('aria-label', 'Supprimer la photo');
+    deleteBtn.textContent = '🗑️';
     deleteBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       if (!confirm('Voulez-vous vraiment supprimer cette photo ?')) return;
-      const deleteItem = event.currentTarget.closest('.gallery-item');
-      deleteItem?.classList.add('is-removing');
+      item.classList.add('is-removing');
       setTimeout(() => {
-        if (deleteItem?.isConnected) {
-          deletePhoto(photo.id);
-        }
+        if (item.isConnected) deletePhoto(photo.id);
       }, 180);
     });
+    item.appendChild(deleteBtn);
+  }
 
-    grid.appendChild(item);
-  });
+  item.addEventListener('click', () => openLightbox(photo.id));
+  return item;
+}
+
+function renderFavoriteGallery(photos = getGallery()) {
+  const favorites = photos.filter(photo => photo.favorite === true);
+  const grid = document.getElementById('favoriteGalleryGrid');
+  const empty = document.getElementById('favoriteGalleryEmpty');
+  const count = document.getElementById('favoritePhotoCount');
+
+  grid.innerHTML = '';
+  count.textContent = `${favorites.length} favori${favorites.length === 1 ? '' : 's'}`;
+  empty.hidden = favorites.length > 0;
+  favorites.forEach(photo => grid.appendChild(createGalleryItem(photo)));
+}
+
+function togglePhotoFavorite(id) {
+  const photos = getGallery();
+  const photo = photos.find(item => item.id === id);
+  if (!photo) return;
+
+  photo.favorite = photo.favorite !== true;
+  saveGallery(photos);
+  renderGallery();
+  if (currentLightboxId === id) renderLightboxPhoto();
 }
 
 function openLightbox(id) {
-  const photo = getGallery().find(p => p.id === id);
+  const photos = getGallery();
+  const photo = photos.find(p => p.id === id);
   if (!photo) return;
 
   currentLightboxId = id;
-  document.getElementById('lightboxImg').src = photo.src;
+  renderLightboxPhoto();
   document.getElementById('lightbox').hidden = false;
+}
+
+function renderLightboxPhoto() {
+  const photos = getGallery();
+  const index = photos.findIndex(photo => photo.id === currentLightboxId);
+  if (index < 0) return;
+
+  const photo = photos[index];
+  document.getElementById('lightboxImg').src = photo.src;
+  document.getElementById('lightboxCounter').textContent = `${index + 1} / ${photos.length}`;
+  const favoriteBtn = document.getElementById('lightboxFavorite');
+  favoriteBtn.textContent = photo.favorite ? '♥ Dans vos favoris' : '♡ Ajouter aux favoris';
+  favoriteBtn.setAttribute('aria-pressed', photo.favorite ? 'true' : 'false');
+}
+
+function navigateLightbox(direction) {
+  const photos = getGallery();
+  const index = photos.findIndex(photo => photo.id === currentLightboxId);
+  if (index < 0 || photos.length < 2) return;
+  const nextIndex = (index + direction + photos.length) % photos.length;
+  currentLightboxId = photos[nextIndex].id;
+  renderLightboxPhoto();
 }
 
 function closeLightbox() {
@@ -2903,8 +3098,21 @@ function initGallery() {
     }
   });
 
+  document.getElementById('lightboxPrev').addEventListener('click', () => navigateLightbox(-1));
+  document.getElementById('lightboxNext').addEventListener('click', () => navigateLightbox(1));
+  document.getElementById('lightboxFavorite').addEventListener('click', () => {
+    if (currentLightboxId) togglePhotoFavorite(currentLightboxId);
+  });
+
   document.getElementById('lightbox').addEventListener('click', (e) => {
     if (e.target.id === 'lightbox') closeLightbox();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (document.getElementById('lightbox').hidden) return;
+    if (event.key === 'Escape') closeLightbox();
+    if (event.key === 'ArrowLeft') navigateLightbox(-1);
+    if (event.key === 'ArrowRight') navigateLightbox(1);
   });
 
   renderGallery();
@@ -3015,6 +3223,7 @@ function updatePlayerUI() {
   const playPauseBtn = document.getElementById('playPauseBtn');
   const progressEl = document.getElementById('trackProgress');
   const timeEl = document.getElementById('trackTime');
+  updatePlayerPlaybackState();
 
   if (!track) {
     titleEl.textContent = 'Aucune musique sélectionnée';
@@ -3032,10 +3241,20 @@ function updatePlayerUI() {
   timeEl.textContent = '00:00 / 00:00';
 }
 
+function updatePlayerPlaybackState() {
+  const isPlaying = Boolean(playlistTracks[currentTrackIndex] && currentAudio && !currentAudio.paused);
+  document.getElementById('playlistPlayer').classList.toggle('is-playing', isPlaying);
+  const button = document.getElementById('playPauseBtn');
+  button.textContent = isPlaying ? '⏸️' : '▶️';
+  button.setAttribute('aria-label', isPlaying ? 'Mettre la piste en pause' : 'Lire la piste');
+}
+
 function getAudioPlayer() {
   if (!currentAudio) {
     currentAudio = new Audio();
     currentAudio.addEventListener('ended', () => playNextTrack());
+    currentAudio.addEventListener('play', updatePlayerPlaybackState);
+    currentAudio.addEventListener('pause', updatePlayerPlaybackState);
     currentAudio.addEventListener('timeupdate', () => {
       const trackProgress = document.getElementById('trackProgress');
       const trackTime = document.getElementById('trackTime');

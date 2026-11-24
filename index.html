@@ -10,7 +10,7 @@
   <script src="supabase.js"></script>
   <script src="js/realtime.js"></script>
   <script src="js/messages.js"></script>
-  <script src="js/script.js"></script>
+  <script src="js/script.js?v=20261124j"></script>
   <script>
     try {
       const rawSettings = localStorage.getItem('carnet_settings');
@@ -29,7 +29,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
   <link rel="apple-touch-icon" href="assets/icons/icon.svg">
-  <link rel="stylesheet" href="css/style.css?v=20260803d">
+  <link rel="stylesheet" href="css/style.css?v=20261124n">
 </head>
 <body>
   <div id="app">
@@ -55,6 +55,13 @@
           <span class="theme-icon-light">☀️</span>
           <span class="theme-icon-dark">🌙</span>
         </button>
+        <a href="#messages" class="nav-link nav-messages-link" data-section="messages" aria-label="Ouvrir Messages" title="Messages">
+          <svg class="nav-messages-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.8-3.6A7.5 7.5 0 1 1 20 11.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 11.5h7M8.5 14.5h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <span class="nav-message-label">Messages</span>
+        </a>
         <button class="btn-install" id="installBtn" hidden>Installer</button>
       </div>
     </nav>
@@ -79,7 +86,10 @@
           </div>
           <div class="hero-content">
             <div class="hero-badge">Notre histoire</div>
-            <h1 class="hero-names" id="coupleNames">Marie &amp; Thomas</h1>
+            <div class="hero-names-row">
+              <h1 class="hero-names" id="coupleNames">Marie &amp; Thomas</h1>
+              <button class="profile-names-edit" id="editCoupleProfileBtn" type="button" aria-label="Modifier les prénoms et surnoms" title="Modifier les prénoms et surnoms">✎</button>
+            </div>
             <div class="hero-quote-card">
               <p class="hero-quote" id="coupleQuote" contenteditable="true" spellcheck="false">« L'amour ne consiste pas à se regarder l'un l'autre, mais à regarder ensemble dans la même direction. »</p>
             </div>
@@ -149,36 +159,34 @@
 
       <section id="messages" class="section">
         <div class="messages-v2-shell">
-          <div class="messages-v2-header">
-            <div class="messages-v2-profile">
-              <div class="message-avatar-stack" aria-hidden="true">
-                <img id="messageAvatarPrimary" src="assets/images/couple.svg" alt="Photo de profil de l’amoureux" class="message-avatar message-avatar--primary">
-                <img id="messageAvatarSecondary" src="assets/images/couple.svg" alt="Photo de profil de l’amoureuse" class="message-avatar message-avatar--secondary">
-                <span class="message-avatar-heart">♡</span>
-              </div>
-              <div class="messages-v2-profile-info">
-                <h2>Messages ❤️</h2>
-                <p class="messages-v2-names" id="messagesCoupleNames">Marie &amp; Thomas</p>
-                <div class="messages-v2-status">
-                  <span class="status-dot"></span>
-                  <span id="messagesStatusText">En ligne • prêt à s’écrire</span>
-                </div>
-              </div>
+          <header class="messages-chat-header">
+            <button class="messages-back-button" id="messagesBackBtn" type="button" aria-label="Retour à l’accueil">‹</button>
+            <img id="messagePartnerAvatar" class="messages-chat-avatar" src="assets/images/couple.svg" alt="">
+            <div class="messages-chat-identity">
+              <h2 id="messagesPartnerName">Votre moitié</h2>
             </div>
-            <button class="messages-v2-call-btn" id="messageVideoCallBtn" type="button">📹 Appel vidéo</button>
-          </div>
+            <details class="messages-settings-menu">
+              <summary aria-label="Paramètres de la messagerie" title="Paramètres">⋮</summary>
+              <div class="messages-settings-panel">
+                <h3>Paramètres de la messagerie</h3>
+              </div>
+            </details>
+          </header>
 
-          <div class="messages-v2-toolbar">
-            <label class="messages-v2-search" for="messageSearch">
-              <span>🔎</span>
-              <input type="search" id="messageSearch" placeholder="Rechercher dans la conversation..." aria-label="Rechercher un message">
-            </label>
-            <div class="messages-v2-filters" role="group" aria-label="Filtres de messages">
-              <button class="message-filter-chip active" type="button" data-view="all">Tous</button>
-              <button class="message-filter-chip" type="button" data-view="favorites">Favoris</button>
-              <button class="message-filter-chip" type="button" data-view="pinned">Épinglés</button>
+          <details class="messages-v2-tools">
+            <summary>Rechercher et filtrer</summary>
+            <div class="messages-v2-toolbar">
+              <label class="messages-v2-search" for="messageSearch">
+                <span aria-hidden="true">⌕</span>
+                <input type="search" id="messageSearch" placeholder="Rechercher dans la conversation..." aria-label="Rechercher un message">
+              </label>
+              <div class="messages-v2-filters" role="group" aria-label="Filtres de messages">
+                <button class="message-filter-chip active" type="button" data-view="all">Tous</button>
+                <button class="message-filter-chip" type="button" data-view="favorites">Favoris</button>
+                <button class="message-filter-chip" type="button" data-view="pinned">Épinglés</button>
+              </div>
             </div>
-          </div>
+          </details>
 
           <div class="messages-v2-pairing" id="messagesPairingBlock">
             <div class="messages-v2-pairing-actions">
@@ -205,27 +213,28 @@
           </div>
           <div class="reply-preview" id="replyPreview" hidden></div>
 
-          <div class="messages-v2-composer">
-            <div class="messages-v2-quick-reactions" aria-label="Réactions rapides">
-              <button type="button" class="message-quick-reaction" data-emoji="❤️">❤️</button>
-              <button type="button" class="message-quick-reaction" data-emoji="😂">😂</button>
-              <button type="button" class="message-quick-reaction" data-emoji="😍">😍</button>
-              <button type="button" class="message-quick-reaction" data-emoji="👍">👍</button>
-            </div>
-            <div class="composer-area">
-              <textarea id="messageComposer" rows="1" placeholder="Écrivez un mot doux..."></textarea>
-              <button id="messageSendBtn" class="message-send-btn" type="button">Envoyer</button>
-            </div>
-            <div class="message-heartburst" id="messageHeartBurst" aria-hidden="true"></div>
-          </div>
-
           <div class="messages-empty" id="modernMessagesEmpty" hidden>
             <span class="empty-icon">💌</span>
             <p>Aucun message à afficher pour le moment.</p>
             <p class="empty-sub">Commencez la conversation avec un doux mot.</p>
           </div>
-          <input type="file" id="messagePhotoInputPrimary" accept="image/*" hidden>
-          <input type="file" id="messagePhotoInputSecondary" accept="image/*" hidden>
+
+          <div class="messages-v2-composer">
+            <div class="composer-area">
+              <details class="message-emoji-picker">
+                <summary aria-label="Insérer un emoji" title="Emoji">☺</summary>
+                <div class="messages-v2-quick-reactions" aria-label="Insérer une réaction">
+                  <button type="button" class="message-quick-reaction" data-emoji="❤️" aria-label="Insérer un cœur">❤️</button>
+                  <button type="button" class="message-quick-reaction" data-emoji="😂" aria-label="Insérer un rire">😂</button>
+                  <button type="button" class="message-quick-reaction" data-emoji="😍" aria-label="Insérer un visage amoureux">😍</button>
+                  <button type="button" class="message-quick-reaction" data-emoji="👍" aria-label="Insérer un pouce">👍</button>
+                </div>
+              </details>
+              <textarea id="messageComposer" rows="1" placeholder="Message" aria-label="Message"></textarea>
+              <button id="messageSendBtn" class="message-send-btn" type="button" aria-label="Envoyer le message" title="Envoyer">➤</button>
+            </div>
+            <div class="message-heartburst" id="messageHeartBurst" aria-hidden="true"></div>
+          </div>
         </div>
       </section>
 
@@ -270,217 +279,10 @@
               <div class="timeline" id="timelineList"></div>
             </section>
           </div>
-        </div>
-      </section>
 
-      <section id="multimedia" class="section">
-        <div class="section-stack">
-          <div class="feature-card">
-            <div class="section-header">
-              <h2>Galerie Photos</h2>
-              <div class="section-actions">
-                <button class="btn-primary" id="addPhotoBtn">+ Photo</button>
-              </div>
-            </div>
-            <input type="file" id="galleryInput" accept="image/*" multiple hidden>
-            <div class="gallery-grid" id="galleryGrid"></div>
-            <div class="empty-state" id="galleryEmpty" hidden>
-              <span class="empty-icon">🖼️</span>
-              <p>Aucune photo pour l'instant</p>
-              <p class="empty-sub">Ajoutez vos plus beaux moments !</p>
-            </div>
-          </div>
-
-          <div class="feature-card">
-            <section id="playlist" class="content-panel">
-              <div class="section-header">
-                <h2>Playlist musicale</h2>
-                <button class="btn-primary" id="addTrackBtn">+ Ajouter</button>
-              </div>
-              <input type="file" id="audioInput" accept=".mp3,.wav,.ogg,.m4a,audio/mpeg,audio/wav,audio/ogg,audio/mp4" multiple hidden>
-              <div class="playlist-player" id="playlistPlayer">
-                <div class="track-info">
-                  <span id="trackCover">🎵</span>
-                  <div>
-                    <div id="trackTitle">Aucune musique sélectionnée</div>
-                    <div id="trackArtist">Ajoutez une piste pour commencer</div>
-                  </div>
-                </div>
-                <div class="player-controls">
-                  <button class="btn-secondary" id="prevTrackBtn">⏮️</button>
-                  <button class="btn-secondary" id="playPauseBtn">▶️</button>
-                  <button class="btn-secondary" id="nextTrackBtn">⏭️</button>
-                  <button class="btn-secondary" id="favTrackBtn">⭐</button>
-                </div>
-                <div class="player-progress">
-                  <input type="range" id="trackProgress" value="0" min="0" max="100">
-                  <span id="trackTime">00:00 / 00:00</span>
-                </div>
-              </div>
-              <div class="playlist-list" id="playlistList"></div>
-            </section>
-          </div>
-        </div>
-      </section>
-
-      <section id="jeux" class="section">
-        <div class="section-stack">
-          <div class="feature-card game-main-card">
-            <div class="game-shell">
-              <div class="game-ambient" aria-hidden="true">
-                <span class="ambient-heart ambient-heart-1">♥</span>
-                <span class="ambient-heart ambient-heart-2">♡</span>
-                <span class="ambient-heart ambient-heart-3">♥</span>
-                <span class="particle particle-1"></span>
-                <span class="particle particle-2"></span>
-                <span class="particle particle-3"></span>
-              </div>
-
-              <div class="section-header game-header">
-                <div>
-                  <h2>Action ou Vérité</h2>
-                  <p class="game-subtitle">Mini-jeu romantique • premium • ultra fun</p>
-                </div>
-                <span class="game-badge">✨ Nouveau</span>
-              </div>
-
-              <div class="game-intro">
-                <p>Choisissez une catégorie, faites tourner la roue et laissez le destin décider entre une action ou une vérité.</p>
-              </div>
-
-              <div class="game-categories" role="group" aria-label="Catégories du jeu">
-                <button class="category-btn active" data-category="romantique">🟢 Romantique</button>
-                <button class="category-btn" data-category="drole">🟡 Drôle</button>
-                <button class="category-btn" data-category="audacieux">🔴 Audacieux</button>
-              </div>
-
-              <div class="game-wheel-card">
-                <div class="wheel-wrapper" id="wheelWrapper">
-                  <div class="wheel-pointer"></div>
-                  <div class="wheel" id="gameWheel">
-                    <div class="wheel-center">💖</div>
-                  </div>
-                </div>
-
-                <div class="game-controls">
-                  <button class="game-spin-btn" id="spinGameBtn">❤️ FAIRE TOURNER</button>
-                  <p class="game-status" id="gameStatus">Catégorie sélectionnée : <span id="selectedCategoryLabel">🟢 Romantique</span></p>
-                </div>
-              </div>
-
-              <div class="game-result-card" id="gameResultCard" hidden>
-                <div class="game-result-badge" id="gameResultBadge">❤️ Action</div>
-                <h3 id="gameResultTitle">Votre défi</h3>
-                <p id="gameResultText">Choisissez une catégorie et lancez la roue.</p>
-                <div class="game-result-meta">
-                  <span id="gameResultCategory">🟢 Romantique</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="feature-card">
-            <div class="section-header history-section-header">
-              <h2>Historique récent</h2>
-              <button class="history-clear-btn" id="clearGameHistoryBtn" type="button">🗑️ Vider l'historique</button>
-            </div>
-            <div class="history-toast" id="gameHistoryToast" role="status" aria-live="polite" hidden></div>
-            <ul class="game-history-list" id="gameHistoryList"></ul>
-          </div>
-        </div>
-      </section>
-
-      <section id="plus" class="section">
-        <div class="section-stack">
-          <div class="feature-card">
-            <section id="settings" class="content-panel">
-              <div class="section-header">
-                <h2>Profil du couple</h2>
-              </div>
-              <div class="settings-grid">
-                <div class="settings-card">
-                  <h3>Modifier le profil</h3>
-                  <form id="settingsForm">
-                    <div class="form-group">
-                      <label for="firstName1">Mon prénom</label>
-                      <input type="text" id="firstName1" required placeholder="Votre prénom">
-                    </div>
-                    <div class="form-group">
-                      <label for="firstName2">Le prénom du partenaire</label>
-                      <input type="text" id="firstName2" required placeholder="Prénom du partenaire">
-                    </div>
-                    <div class="form-group">
-                      <label for="nickname1">Mon surnom</label>
-                      <input type="text" id="nickname1" placeholder="Surnom">
-                    </div>
-                    <div class="form-group">
-                      <label for="nickname2">Le surnom du partenaire</label>
-                      <input type="text" id="nickname2" placeholder="Surnom du partenaire">
-                    </div>
-                    <div class="form-group">
-                      <label for="settingsQuote">Citation d'accueil</label>
-                      <input type="text" id="settingsQuote" placeholder="Votre citation">
-                    </div>
-                    <div class="form-group">
-                      <label for="settingsDescription">Description courte</label>
-                      <textarea id="settingsDescription" rows="3" placeholder="Une courte description de votre couple"></textarea>
-                    </div>
-                    <div class="form-group">
-                      <label for="settingsStartDate">Date de début de la relation</label>
-                      <input type="date" id="settingsStartDate" required>
-                    </div>
-                    <div class="form-group avatar-group avatar-group--split">
-                      <label>Photos du couple</label>
-                      <div class="avatar-preview-grid">
-                        <div class="avatar-preview-card">
-                          <div class="avatar-preview" id="settingsPhotoPreview1">
-                            <img src="assets/images/couple.svg" alt="Photo du premier partenaire">
-                          </div>
-                          <button type="button" class="btn-secondary btn-sm" id="settingsPhotoBtn1">Photo 1</button>
-                          <input type="file" id="settingsPhotoInput1" accept="image/*" hidden>
-                        </div>
-                        <div class="avatar-preview-card">
-                          <div class="avatar-preview" id="settingsPhotoPreview2">
-                            <img src="assets/images/couple.svg" alt="Photo du second partenaire">
-                          </div>
-                          <button type="button" class="btn-secondary btn-sm" id="settingsPhotoBtn2">Photo 2</button>
-                          <input type="file" id="settingsPhotoInput2" accept="image/*" hidden>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="form-group toggle-group">
-                      <label for="showNicknames">Afficher les surnoms à la place des prénoms</label>
-                      <input type="checkbox" id="showNicknames">
-                    </div>
-                    <div class="form-group">
-                      <label>Thème de l’application</label>
-                      <div class="theme-selector" role="radiogroup" aria-label="Sélection du thème">
-                        <button type="button" class="theme-option" data-theme-choice="dark">🌙 Mode sombre</button>
-                        <button type="button" class="theme-option" data-theme-choice="light">☀️ Mode clair</button>
-                        <button type="button" class="theme-option" data-theme-choice="auto">🌗 Automatique</button>
-                      </div>
-                      <input type="hidden" id="themeModeInput" value="dark">
-                    </div>
-                    <div class="modal-actions">
-                      <button type="submit" class="btn-primary">Enregistrer</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <div class="feature-card">
-            <section id="backup" class="content-panel">
-              <div class="section-header">
-                <h2>Sauvegarde</h2>
-              </div>
-              <div class="backup-actions">
-                <button class="btn-primary" id="exportBtn">Exporter JSON</button>
-                <button class="btn-secondary" id="importBtn">Importer JSON</button>
-                <input type="file" id="importInput" accept="application/json" hidden>
-              </div>
-            </section>
+          <div class="souvenirs-tools-heading">
+            <span class="plus-category-icon" aria-hidden="true">✧</span>
+            <div><h2>Nos repères et accomplissements</h2><p>Projets, statistiques et lieux précieux de votre histoire.</p></div>
           </div>
 
           <div class="feature-card">
@@ -537,6 +339,211 @@
             </section>
           </div>
         </div>
+      </section>
+
+      <section id="multimedia" class="section">
+        <div class="section-stack">
+          <div class="feature-card">
+            <div class="section-header">
+              <div>
+                <h2>Notre galerie</h2>
+                <p class="media-section-intro">Les instants précieux de notre histoire, réunis au même endroit.</p>
+              </div>
+              <div class="section-actions">
+                <button class="btn-primary" id="addPhotoBtn">+ Photo</button>
+              </div>
+            </div>
+            <input type="file" id="galleryInput" accept="image/*" multiple hidden>
+            <div class="gallery-grid" id="galleryGrid"></div>
+            <div class="empty-state" id="galleryEmpty" hidden>
+              <span class="empty-icon">🖼️</span>
+              <p>Aucune photo pour l'instant</p>
+              <p class="empty-sub">Ajoutez vos plus beaux moments !</p>
+            </div>
+          </div>
+
+          <div class="feature-card special-memories-card">
+            <section class="content-panel" aria-labelledby="specialMemoriesTitle">
+              <div class="section-header">
+                <div>
+                  <h2 id="specialMemoriesTitle">Nos souvenirs spéciaux</h2>
+                  <p class="media-section-intro">Gardez tout près les moments qui vous ressemblent.</p>
+                </div>
+                <span class="favorite-photo-count" id="favoritePhotoCount">0 favori</span>
+              </div>
+              <div class="gallery-grid special-gallery-grid" id="favoriteGalleryGrid"></div>
+              <div class="empty-state" id="favoriteGalleryEmpty">
+                <span class="empty-icon">♡</span>
+                <p>Vos moments préférés auront leur place ici</p>
+                <p class="empty-sub">Touchez le cœur d’une photo pour l’ajouter à vos souvenirs spéciaux.</p>
+              </div>
+            </section>
+          </div>
+
+          <div class="feature-card">
+            <section id="playlist" class="content-panel">
+              <div class="section-header">
+                <div>
+                  <h2>Notre univers musical</h2>
+                  <p class="media-section-intro">Les mélodies qui accompagnent votre histoire.</p>
+                </div>
+                <button class="btn-primary" id="addTrackBtn">+ Ajouter</button>
+              </div>
+              <input type="file" id="audioInput" accept=".mp3,.wav,.ogg,.m4a,audio/mpeg,audio/wav,audio/ogg,audio/mp4" multiple hidden>
+              <div class="playlist-player" id="playlistPlayer">
+                <div class="track-info">
+                  <span id="trackCover" class="track-cover" role="img" aria-label="Illustration de la piste">🎵</span>
+                  <div>
+                    <div id="trackTitle">Aucune musique sélectionnée</div>
+                    <div id="trackArtist">Ajoutez une piste pour commencer</div>
+                  </div>
+                </div>
+                <div class="player-controls">
+                  <button class="btn-secondary" id="prevTrackBtn" type="button" aria-label="Piste précédente" title="Piste précédente">⏮️</button>
+                  <button class="btn-secondary" id="playPauseBtn" type="button" aria-label="Lire la piste" title="Lire ou mettre en pause">▶️</button>
+                  <button class="btn-secondary" id="nextTrackBtn" type="button" aria-label="Piste suivante" title="Piste suivante">⏭️</button>
+                  <button class="btn-secondary" id="favTrackBtn" type="button" aria-label="Ajouter la piste aux favoris" title="Piste favorite">⭐</button>
+                </div>
+                <div class="music-visualizer" aria-hidden="true">
+                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                </div>
+                <div class="player-progress">
+                  <input type="range" id="trackProgress" value="0" min="0" max="100">
+                  <span id="trackTime">00:00 / 00:00</span>
+                </div>
+              </div>
+              <div class="playlist-list" id="playlistList"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section id="jeux" class="section">
+        <div class="section-stack">
+          <div class="feature-card game-main-card">
+            <div class="game-shell">
+              <div class="game-ambient" aria-hidden="true">
+                <span class="ambient-heart ambient-heart-1">♥</span>
+                <span class="ambient-heart ambient-heart-2">♡</span>
+                <span class="ambient-heart ambient-heart-3">♥</span>
+                <span class="particle particle-1"></span>
+                <span class="particle particle-2"></span>
+                <span class="particle particle-3"></span>
+              </div>
+
+              <div class="section-header game-header">
+                <div>
+                  <h2>Action ou Vérité</h2>
+                  <p class="game-subtitle">Mini-jeu romantique • premium • ultra fun</p>
+                </div>
+                <span class="game-badge">✨ Nouveau</span>
+              </div>
+
+              <div class="game-intro">
+                <p>Choisissez une catégorie, faites tourner la roue et laissez le destin décider entre une action ou une vérité.</p>
+              </div>
+
+              <div class="game-categories" role="group" aria-label="Catégories du jeu">
+                <button class="category-btn active" data-category="romantique">🟢 Romantique</button>
+                <button class="category-btn" data-category="drole">🟡 Drôle</button>
+                <button class="category-btn" data-category="audacieux">🔴 Audacieux</button>
+              </div>
+
+              <div class="game-wheel-card">
+                <div class="wheel-wrapper" id="wheelWrapper">
+                  <div class="wheel-pointer"></div>
+                  <div class="wheel" id="gameWheel" role="img" aria-label="Roue Action ou Vérité, touchez la roue ou faites glisser pour jouer">
+                    <span class="wheel-segment-label" style="--segment-angle: 22.5deg">ACTION</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 67.5deg">VÉRITÉ</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 112.5deg">ACTION</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 157.5deg">VÉRITÉ</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 202.5deg">ACTION</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 247.5deg">VÉRITÉ</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 292.5deg">ACTION</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 337.5deg">VÉRITÉ</span>
+                  </div>
+                  <div class="wheel-center" aria-hidden="true">💖</div>
+                </div>
+
+                <div class="game-controls">
+                  <button class="game-spin-btn" id="spinGameBtn">❤️ FAIRE TOURNER</button>
+                  <p class="game-status" id="gameStatus">Catégorie sélectionnée : <span id="selectedCategoryLabel">🟢 Romantique</span></p>
+                </div>
+              </div>
+
+              <div class="game-result-card" id="gameResultCard" hidden>
+                <div class="game-result-badge" id="gameResultBadge">❤️ Action</div>
+                <h3 id="gameResultTitle">Votre défi</h3>
+                <p class="game-result-love" id="gameResultLove"></p>
+                <p id="gameResultText">Choisissez une catégorie et lancez la roue.</p>
+                <div class="game-result-meta">
+                  <span id="gameResultCategory">🟢 Romantique</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <section id="plus" class="section">
+        <div class="plus-page section-stack">
+          <header class="plus-hero">
+            <span class="plus-hero-icon" aria-hidden="true">✦</span>
+            <div>
+              <p class="plus-eyebrow">NOTRE PETIT UNIVERS</p>
+              <h1>Plus</h1>
+              <p>Personnalisons notre petit univers</p>
+            </div>
+            <span class="plus-hero-heart" aria-hidden="true">♡</span>
+          </header>
+
+          <div class="plus-category-heading">
+            <span class="plus-category-icon" aria-hidden="true">✨</span>
+            <div><h2>Préférences de l’application</h2><p>Choisissez l’apparence de votre carnet.</p></div>
+          </div>
+          <div class="feature-card plus-feature-card">
+            <section id="settings" class="content-panel plus-settings-panel">
+              <div class="plus-subsection plus-personalization">
+                <div class="plus-subsection-heading">
+                  <span aria-hidden="true">🎨</span>
+                  <div><h3>Apparence &amp; préférences</h3><p>Personnalisez l’affichage selon vos envies.</p></div>
+                </div>
+                <div class="form-group toggle-group plus-nickname-toggle">
+                  <label for="showNicknames">Afficher les surnoms à la place des prénoms</label>
+                  <input type="checkbox" id="showNicknames">
+                </div>
+                <div class="form-group plus-theme-group">
+                  <label>Thème de l’application</label>
+                  <div class="theme-selector" role="radiogroup" aria-label="Sélection du thème">
+                    <button type="button" class="theme-option" data-theme-choice="dark">🌙 Mode sombre</button>
+                    <button type="button" class="theme-option" data-theme-choice="light">☀️ Mode clair</button>
+                    <button type="button" class="theme-option" data-theme-choice="auto">🌗 Automatique</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="plus-category-heading">
+            <span class="plus-category-icon" aria-hidden="true">⚙</span>
+            <div><h2>Paramètres</h2><p>Gardez une copie des données de votre carnet.</p></div>
+          </div>
+          <div class="feature-card plus-feature-card">
+            <section id="backup" class="content-panel plus-backup-panel">
+              <div class="section-header">
+                <div><h2>💾 Sauvegarde &amp; données</h2><p>Exportez ou restaurez les données de l’application.</p></div>
+              </div>
+              <div class="backup-actions">
+                <button class="btn-primary" id="exportBtn">Exporter JSON</button>
+                <button class="btn-secondary" id="importBtn">Importer JSON</button>
+                <input type="file" id="importInput" accept="application/json" hidden>
+              </div>
+            </section>
+          </div>
+
+        </div>
+        <footer class="plus-footer">Notre Carnet <span aria-label="cœur">❤️</span> — Chaque souvenir compte.</footer>
       </section>
     </main>
 
@@ -600,6 +607,38 @@
       </div>
     </div>
 
+    <!-- Couple Profile Modal -->
+    <div class="modal-overlay" id="profileModal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle">
+        <div class="modal-header">
+          <h3 id="profileModalTitle">Modifier notre profil</h3>
+          <button class="btn-close" id="closeProfileModal" type="button" aria-label="Fermer">&times;</button>
+        </div>
+        <form id="profileForm">
+          <div class="form-group">
+            <label for="firstName1">Mon prénom</label>
+            <input type="text" id="firstName1" required placeholder="Votre prénom">
+          </div>
+          <div class="form-group">
+            <label for="nickname1">Mon surnom</label>
+            <input type="text" id="nickname1" placeholder="Surnom">
+          </div>
+          <div class="form-group">
+            <label for="firstName2">Prénom du partenaire</label>
+            <input type="text" id="firstName2" required placeholder="Prénom du partenaire">
+          </div>
+          <div class="form-group">
+            <label for="nickname2">Son surnom</label>
+            <input type="text" id="nickname2" placeholder="Surnom du partenaire">
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancelProfileBtn">Annuler</button>
+            <button type="submit" class="btn-primary">Enregistrer</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Onboarding Modal -->
     <div class="modal-overlay" id="onboardingModal" hidden>
       <div class="modal large onboarding-modal" role="dialog" aria-labelledby="onboardingTitle">
@@ -646,10 +685,18 @@
     </div>
 
     <!-- Lightbox -->
-    <div class="lightbox" id="lightbox" hidden>
-      <button class="lightbox-close" id="lightboxClose" aria-label="Fermer">&times;</button>
-      <img id="lightboxImg" src="" alt="Photo agrandie">
-      <button class="lightbox-delete" id="lightboxDelete">🗑️ Supprimer</button>
+    <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Visionneuse de photos" hidden>
+      <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Fermer">&times;</button>
+      <div class="lightbox-stage">
+        <button class="lightbox-nav" id="lightboxPrev" type="button" aria-label="Photo précédente">‹</button>
+        <img id="lightboxImg" src="" alt="Photo agrandie">
+        <button class="lightbox-nav" id="lightboxNext" type="button" aria-label="Photo suivante">›</button>
+      </div>
+      <div class="lightbox-toolbar">
+        <span class="lightbox-counter" id="lightboxCounter" aria-live="polite"></span>
+        <button class="lightbox-favorite" id="lightboxFavorite" type="button" aria-pressed="false">♡ Ajouter aux favoris</button>
+        <button class="lightbox-delete" id="lightboxDelete" type="button">🗑️ Supprimer</button>
+      </div>
     </div>
 
     <!-- Toast -->
@@ -661,6 +708,6 @@
     </div>
   </div>
 
-  <script src="js/script.js?v=20260803d"></script>
+  <script src="js/script.js?v=20261124j"></script>
 </body>
 </html>
