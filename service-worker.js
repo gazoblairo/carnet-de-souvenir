@@ -1,13 +1,19 @@
-const CACHE_NAME = 'carnet-v19';
+const CACHE_NAME = 'carnet-v41';
 const ASSETS = [
   '/',
   '/index.html',
-  '/css/style.css?v=20261124n',
-  '/js/script.js?v=20261124j',
+  '/css/style.css?v=20261125o',
+  '/js/i18n.js?v=20261125b',
+  '/js/script.js?v=20261125r',
+  '/supabase.js',
+  '/js/realtime.js',
+  '/js/messages.js',
   '/manifest.json',
   '/assets/icons/icon.svg',
   '/assets/icons/icon-192.svg',
   '/assets/icons/icon-512.svg',
+  '/assets/icons/icon-192.png',
+  '/assets/icons/icon-512.png',
   '/assets/images/couple.svg'
 ];
 

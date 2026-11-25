@@ -33,7 +33,7 @@
       text: row.text || row.content || row.body || '',
       type: row.type || 'text',
       createdAt,
-      time: row.time || new Date(createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      time: row.time || new Date(createdAt).toLocaleTimeString(window.I18n?.getLocale() || 'fr-FR', { hour: '2-digit', minute: '2-digit' }),
       status: row.status || (senderCode === state.myCode ? 'sent' : 'delivered'),
       reactions: row.reactions || row.metadata?.reactions || {},
       pinned: !!row.pinned,

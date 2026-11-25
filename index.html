@@ -5,12 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Carnet — Votre histoire d'amour, jour après jour">
   <meta name="theme-color" content="#2b1537">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Carnet">
   <title>Carnet — Notre Histoire</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js"></script>
   <script src="js/realtime.js"></script>
   <script src="js/messages.js"></script>
-  <script src="js/script.js?v=20261124j"></script>
+  <script src="js/i18n.js?v=20261125b"></script>
   <script>
     try {
       const rawSettings = localStorage.getItem('carnet_settings');
@@ -26,10 +28,10 @@
       console.warn('Theme init error', error);
     }
   </script>
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
-  <link rel="apple-touch-icon" href="assets/icons/icon.svg">
-  <link rel="stylesheet" href="css/style.css?v=20261124n">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css?v=20261125o">
 </head>
 <body>
   <div id="app">
@@ -43,12 +45,12 @@
         <span></span><span></span><span></span>
       </button>
       <ul class="nav-links" id="navLinks">
-        <li><a href="#accueil" class="nav-link active" data-section="accueil">❤️ Accueil</a></li>
-        <li><a href="#messages" class="nav-link" data-section="messages">💌 Messages ❤️</a></li>
-        <li><a href="#souvenirs" class="nav-link" data-section="souvenirs">📝 Souvenirs</a></li>
-        <li><a href="#multimedia" class="nav-link" data-section="multimedia">📷 Médias</a></li>
-        <li><a href="#jeux" class="nav-link" data-section="jeux">🎮 Jeux</a></li>
-        <li><a href="#plus" class="nav-link" data-section="plus">⚙️ Plus</a></li>
+        <li><a href="#accueil" class="nav-link active" data-section="accueil" data-i18n="nav.home">❤️ Accueil</a></li>
+        <li><a href="#messages" class="nav-link" data-section="messages" data-i18n="nav.messages">💌 Messages ❤️</a></li>
+        <li><a href="#souvenirs" class="nav-link" data-section="souvenirs" data-i18n="nav.memories">📝 Souvenirs</a></li>
+        <li><a href="#multimedia" class="nav-link" data-section="multimedia" data-i18n="nav.media">📷 Médias</a></li>
+        <li><a href="#jeux" class="nav-link" data-section="jeux" data-i18n="nav.games">🎮 Jeux</a></li>
+        <li><a href="#plus" class="nav-link" data-section="plus" data-i18n="nav.more">⚙️ Plus</a></li>
       </ul>
       <div class="nav-actions">
         <button class="btn-icon" id="themeToggle" aria-label="Changer le thème">
@@ -60,9 +62,9 @@
             <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.8-3.6A7.5 7.5 0 1 1 20 11.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M8.5 11.5h7M8.5 14.5h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
           </svg>
-          <span class="nav-message-label">Messages</span>
+          <span class="nav-message-label" data-i18n="nav.messagesShort">Messages</span>
         </a>
-        <button class="btn-install" id="installBtn" hidden>Installer</button>
+          <button class="btn-install" id="installBtn" hidden data-i18n="common.install">Installer</button>
       </div>
     </nav>
 
@@ -85,7 +87,7 @@
             <input type="file" id="photoInput2" accept="image/*" hidden>
           </div>
           <div class="hero-content">
-            <div class="hero-badge">Notre histoire</div>
+            <div class="hero-badge" data-i18n="home.story">Notre histoire</div>
             <div class="hero-names-row">
               <h1 class="hero-names" id="coupleNames">Marie &amp; Thomas</h1>
               <button class="profile-names-edit" id="editCoupleProfileBtn" type="button" aria-label="Modifier les prénoms et surnoms" title="Modifier les prénoms et surnoms">✎</button>
@@ -99,34 +101,34 @@
         <div class="counter-card">
           <div class="counter-icon">💕</div>
           <div class="counter-info">
-            <p class="counter-label">Ensemble depuis</p>
+            <p class="counter-label" data-i18n="home.together">Ensemble depuis</p>
             <div class="counter-value" id="daysCounter">0</div>
-            <p class="counter-sub" id="counterSub">jours de bonheur</p>
+            <p class="counter-sub" id="counterSub" data-i18n="home.happyDays">jours de bonheur</p>
           </div>
-          <button class="btn-secondary btn-sm" id="editDateBtn">Modifier la date</button>
+          <button class="btn-secondary btn-sm" id="editDateBtn" data-i18n="home.editDate">Modifier la date</button>
         </div>
 
         <div class="stats-grid">
           <div class="stat-card">
             <span class="stat-number" id="statMemories">0</span>
-            <span class="stat-label">Souvenirs</span>
+            <span class="stat-label" data-i18n="nav.memories">Souvenirs</span>
           </div>
           <div class="stat-card">
             <span class="stat-number" id="statPhotos">0</span>
-            <span class="stat-label">Photos</span>
+            <span class="stat-label" data-i18n="media.addPhoto">Photos</span>
           </div>
           <div class="stat-card">
             <span class="stat-number" id="statYears">0</span>
-            <span class="stat-label">Années</span>
+            <span class="stat-label" data-i18n="home.years">Années</span>
           </div>
         </div>
 
         <div class="feature-grid">
           <div class="feature-card">
-            <h3>Défi du jour</h3>
+            <h3 data-i18n="home.challenge">Défi du jour</h3>
             <div class="challenge-card compact">
               <div class="challenge-header">
-                <span class="challenge-badge">Défi du jour</span>
+                <span class="challenge-badge" data-i18n="home.challenge">Défi du jour</span>
                 <span class="challenge-date" id="challengeDate"></span>
               </div>
               <div class="challenge-body">
@@ -134,14 +136,14 @@
                 <p class="challenge-text" id="challengeText"></p>
               </div>
               <div class="challenge-actions">
-                <button class="btn-primary" id="newChallengeBtn">Nouveau défi</button>
-                <button class="btn-secondary" id="completeChallengeBtn">Marquer comme fait ✓</button>
+                <button class="btn-primary" id="newChallengeBtn" data-i18n="home.newChallenge">Nouveau défi</button>
+                <button class="btn-secondary" id="completeChallengeBtn" data-i18n="home.completeChallenge">Marquer comme fait ✓</button>
               </div>
               <div class="challenge-done" id="challengeDone" hidden>
                 <span>✨ Défi accompli aujourd'hui !</span>
               </div>
               <div class="challenge-history">
-                <h3>Défis récents</h3>
+                <h3 data-i18n="home.recentChallenges">Défis récents</h3>
                 <ul class="history-list" id="challengeHistory"></ul>
               </div>
             </div>
@@ -161,14 +163,136 @@
         <div class="messages-v2-shell">
           <header class="messages-chat-header">
             <button class="messages-back-button" id="messagesBackBtn" type="button" aria-label="Retour à l’accueil">‹</button>
-            <img id="messagePartnerAvatar" class="messages-chat-avatar" src="assets/images/couple.svg" alt="">
-            <div class="messages-chat-identity">
+            <img id="messagePartnerAvatar" class="messages-chat-avatar" src="assets/images/couple.svg" alt="Photo de profil du partenaire" role="button" tabindex="0" aria-label="Modifier la photo de profil du partenaire" title="Modifier la photo de profil">
+            <input id="messagePhotoInputSecondary" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden>
+            <dialog class="message-avatar-preview-dialog" id="messageAvatarPreviewDialog" aria-labelledby="messageAvatarPreviewTitle">
+              <h3 id="messageAvatarPreviewTitle">Aperçu de la photo</h3>
+              <img id="messageAvatarPreviewImage" alt="Aperçu de la photo sélectionnée">
+              <div class="message-avatar-preview-actions">
+                <button class="btn-secondary" id="cancelMessageAvatarPreview" type="button">Annuler</button>
+                <button class="btn-primary" id="confirmMessageAvatarPhoto" type="button">Utiliser cette photo</button>
+              </div>
+            </dialog>
+            <div class="messages-chat-identity" role="button" tabindex="0" aria-label="Ouvrir les paramètres de la conversation" aria-haspopup="dialog" aria-controls="messagesSettingsPanel">
               <h2 id="messagesPartnerName">Votre moitié</h2>
             </div>
             <details class="messages-settings-menu">
-              <summary aria-label="Paramètres de la messagerie" title="Paramètres">⋮</summary>
-              <div class="messages-settings-panel">
-                <h3>Paramètres de la messagerie</h3>
+              <summary aria-label="Paramètres de la messagerie" title="Paramètres"><span aria-hidden="true">⋮</span></summary>
+              <div class="messages-settings-panel" id="messagesSettingsPanel" role="dialog" aria-modal="false" aria-labelledby="messagesSettingsTitle">
+                <header class="messages-settings-heading">
+                  <div><span class="messages-settings-kicker">NOTRE CARNET ❤️</span><h3 id="messagesSettingsTitle">Paramètres de la conversation</h3></div>
+                  <button class="messages-settings-close" id="messagesSettingsClose" type="button" aria-label="Fermer les paramètres">×</button>
+                </header>
+                <p class="messages-settings-scope">Préférences personnelles · enregistrées sur cet appareil</p>
+                <div class="messages-settings-layout">
+                  <nav class="messages-settings-tabs" role="tablist" aria-label="Catégories des paramètres" aria-orientation="vertical">
+                    <button class="messages-settings-tab is-active" type="button" role="tab" id="settingsTabAppearance" aria-selected="true" aria-controls="settingsPanelAppearance" data-settings-tab="appearance"><span>🎨</span> Apparence</button>
+                    <button class="messages-settings-tab" type="button" role="tab" id="settingsTabNotifications" aria-selected="false" aria-controls="settingsPanelNotifications" data-settings-tab="notifications"><span>🔔</span> Notifications</button>
+                    <button class="messages-settings-tab" type="button" role="tab" id="settingsTabPrivacy" aria-selected="false" aria-controls="settingsPanelPrivacy" data-settings-tab="privacy"><span>🔒</span> Confidentialité</button>
+                    <button class="messages-settings-tab" type="button" role="tab" id="settingsTabMessages" aria-selected="false" aria-controls="settingsPanelMessages" data-settings-tab="messages"><span>💬</span> Messages</button>
+                    <button class="messages-settings-tab" type="button" role="tab" id="settingsTabOrganization" aria-selected="false" aria-controls="settingsPanelOrganization" data-settings-tab="organization"><span>📌</span> Organisation</button>
+                    <button class="messages-settings-tab" type="button" role="tab" id="settingsTabMedia" aria-selected="false" aria-controls="settingsPanelMedia" data-settings-tab="media"><span>🖼️</span> Médias et fichiers</button>
+                    <button class="messages-settings-tab" type="button" role="tab" id="settingsTabConversation" aria-selected="false" aria-controls="settingsPanelConversation" data-settings-tab="conversation"><span>🗑️</span> Conversation</button>
+                    <button class="messages-settings-tab" type="button" role="tab" id="settingsTabAbout" aria-selected="false" aria-controls="settingsPanelAbout" data-settings-tab="about"><span>❤️</span> À propos de nous</button>
+                  </nav>
+
+                  <div class="messages-settings-content">
+                    <section class="messages-settings-view is-active" role="tabpanel" id="settingsPanelAppearance" aria-labelledby="settingsTabAppearance" data-settings-panel="appearance">
+                      <h4>Apparence</h4>
+                      <div class="messages-background-section">
+                        <h5>Fond de discussion</h5>
+                        <p class="messages-background-help">Choisissez une ambiance pour votre écran de conversation.</p>
+                        <div class="messages-background-swatches" role="group" aria-label="Couleurs et dégradés du fond de discussion">
+                          <button class="messages-background-swatch is-selected" type="button" data-message-background="sunset" aria-pressed="true" aria-label="Rose romantique"><span class="messages-background-swatch-preview bg-swatch-rose"></span><span>Rose romantique</span></button>
+                          <button class="messages-background-swatch" type="button" data-message-background="violet" aria-pressed="false" aria-label="Violet"><span class="messages-background-swatch-preview bg-swatch-violet"></span><span>Violet</span></button>
+                          <button class="messages-background-swatch" type="button" data-message-background="sky" aria-pressed="false" aria-label="Bleu ciel"><span class="messages-background-swatch-preview bg-swatch-sky"></span><span>Bleu ciel</span></button>
+                          <button class="messages-background-swatch" type="button" data-message-background="midnight" aria-pressed="false" aria-label="Noir élégant"><span class="messages-background-swatch-preview bg-swatch-midnight"></span><span>Noir élégant</span></button>
+                          <button class="messages-background-swatch" type="button" data-message-background="ruby" aria-pressed="false" aria-label="Rouge velours"><span class="messages-background-swatch-preview bg-swatch-ruby"></span><span>Rouge velours</span></button>
+                          <button class="messages-background-swatch" type="button" data-message-background="garden" aria-pressed="false" aria-label="Vert sauge"><span class="messages-background-swatch-preview bg-swatch-garden"></span><span>Vert sauge</span></button>
+                          <button class="messages-background-swatch" type="button" data-message-background="beige" aria-pressed="false" aria-label="Beige doux"><span class="messages-background-swatch-preview bg-swatch-beige"></span><span>Beige doux</span></button>
+                          <button class="messages-background-swatch" type="button" data-message-background="ocean" aria-pressed="false" aria-label="Bleu lagon"><span class="messages-background-swatch-preview bg-swatch-ocean"></span><span>Bleu lagon</span></button>
+                          <button class="messages-background-swatch" type="button" data-message-background="champagne" aria-pressed="false" aria-label="Champagne rosé"><span class="messages-background-swatch-preview bg-swatch-champagne"></span><span>Champagne rosé</span></button>
+                          <button class="messages-background-swatch" type="button" data-message-background="aurora" aria-pressed="false" aria-label="Aurore"><span class="messages-background-swatch-preview bg-swatch-aurora"></span><span>Aurore</span></button>
+                        </div>
+                        <div class="messages-background-photo">
+                          <div class="messages-background-photo-preview" id="conversationBackgroundPreview" hidden>
+                            <img id="conversationBackgroundPreviewImage" alt="Aperçu du fond de discussion">
+                            <span id="conversationBackgroundPreviewLabel">Aperçu de votre photo</span>
+                          </div>
+                          <input id="conversationBackgroundInput" type="file" accept="image/*" hidden>
+                          <div class="messages-background-photo-actions">
+                            <button class="messages-settings-secondary" id="chooseConversationBackground" type="button">🖼️ Choisir dans ma galerie</button>
+                            <button class="messages-settings-secondary" id="applyConversationBackground" type="button" hidden>Utiliser cette image</button>
+                            <button class="messages-settings-secondary" id="cancelConversationBackground" type="button" hidden>Annuler l’aperçu</button>
+                            <button class="messages-settings-secondary" id="removeConversationBackground" type="button" hidden>Supprimer mon image</button>
+                          </div>
+                        </div>
+                      </div>
+                      <label class="messages-setting-field" for="conversationThemeSelect"><span>Thème de l’application</span><select id="conversationThemeSelect"><option value="dark">Sombre</option><option value="light">Clair</option><option value="auto">Automatique</option></select></label>
+                      <label class="messages-setting-field" for="messageBubbleColorSelect"><span>Couleur de vos bulles</span><select id="messageBubbleColorSelect"><option value="rose">Rose tendre</option><option value="plum">Prune</option><option value="berry">Framboise</option><option value="sage">Vert sauge</option></select></label>
+                      <button class="messages-settings-secondary" id="restoreMessageAppearance" type="button">Restaurer l’apparence par défaut</button>
+                    </section>
+
+                    <section class="messages-settings-view" role="tabpanel" id="settingsPanelNotifications" aria-labelledby="settingsTabNotifications" data-settings-panel="notifications" hidden>
+                      <h4>Notifications</h4>
+                      <p class="messages-settings-note">Les notifications de conversation ne sont pas configurées dans cette version.</p>
+                      <div class="messages-setting-row"><span>Notifications de nouveaux messages</span><input type="checkbox" disabled aria-label="Notifications non disponibles"></div>
+                      <div class="messages-setting-row"><span>Sons de notification</span><input type="checkbox" disabled aria-label="Sons non disponibles"></div>
+                      <div class="messages-setting-row"><span>Alertes de nouveaux messages</span><input type="checkbox" disabled aria-label="Alertes non disponibles"></div>
+                    </section>
+
+                    <section class="messages-settings-view" role="tabpanel" id="settingsPanelPrivacy" aria-labelledby="settingsTabPrivacy" data-settings-panel="privacy" hidden>
+                      <h4>Confidentialité</h4>
+                      <p class="messages-settings-note">Les confirmations de lecture sont gérées automatiquement. Les réglages de présence et d’indicateur de saisie ne sont pas disponibles.</p>
+                      <div class="messages-setting-row"><span>Visibilité du statut en ligne</span><input type="checkbox" disabled aria-label="Réglage du statut non disponible"></div>
+                      <div class="messages-setting-row"><span>Confirmations de lecture</span><input type="checkbox" checked disabled aria-label="Confirmations de lecture activées automatiquement"></div>
+                      <div class="messages-setting-row"><span>Indicateur de saisie</span><input type="checkbox" disabled aria-label="Indicateur de saisie non disponible"></div>
+                    </section>
+
+                    <section class="messages-settings-view" role="tabpanel" id="settingsPanelMessages" aria-labelledby="settingsTabMessages" data-settings-panel="messages" hidden>
+                      <h4>Personnalisation des messages</h4>
+                      <label class="messages-setting-field" for="messageBubbleStyleSelect"><span>Style des bulles</span><select id="messageBubbleStyleSelect"><option value="soft">Doux</option><option value="classic">Classique</option><option value="compact">Compact</option></select></label>
+                      <label class="messages-setting-field" for="messageTextSize"><span>Taille du texte <output id="messageTextSizeValue">16 px</output></span><input id="messageTextSize" type="range" min="14" max="20" step="1" value="16"></label>
+                      <label class="messages-setting-field" for="messageReactionSet"><span>Réactions rapides</span><select id="messageReactionSet"><option value="classic">Classiques</option><option value="romantic">Romantiques</option><option value="playful">Complices</option></select></label>
+                      <label class="messages-setting-row" for="messageTimeToggle"><span>Afficher l’heure des messages</span><input id="messageTimeToggle" type="checkbox" checked></label>
+                    </section>
+
+                    <section class="messages-settings-view" role="tabpanel" id="settingsPanelOrganization" aria-labelledby="settingsTabOrganization" data-settings-panel="organization" hidden>
+                      <h4>Organisation</h4>
+                      <button class="messages-settings-action" type="button" data-message-filter="favorites">⭐ Voir les favoris <span id="settingsFavoriteCount">0</span></button>
+                      <button class="messages-settings-action" type="button" data-message-filter="pinned">📌 Voir les messages épinglés <span id="settingsPinnedCount">0</span></button>
+                      <label class="messages-setting-field" for="settingsConversationSearch"><span>⌕ Rechercher dans la conversation</span><input id="settingsConversationSearch" type="search" placeholder="Un mot, un fichier…"></label>
+                      <p class="messages-settings-scope">Favoris et épingles sont associés aux messages de la conversation.</p>
+                    </section>
+
+                    <section class="messages-settings-view" role="tabpanel" id="settingsPanelMedia" aria-labelledby="settingsTabMedia" data-settings-panel="media" hidden>
+                      <h4>Médias et fichiers</h4>
+                      <button class="messages-settings-action" type="button" data-media-filter="image">🖼️ Photos <span id="settingsPhotoCount">0</span></button>
+                      <button class="messages-settings-action" type="button" data-media-filter="document">📄 Fichiers <span id="settingsFileCount">0</span></button>
+                      <button class="messages-settings-action" type="button" data-media-filter="video" disabled>🎞️ Vidéos <span id="settingsVideoCount">0</span></button>
+                      <button class="messages-settings-action" type="button" data-media-filter="link" disabled>🔗 Liens partagés <span id="settingsLinkCount">0</span></button>
+                      <p class="messages-settings-note">Les téléchargements sont conservés à leur emplacement d’origine; aucun gestionnaire de téléchargement n’est disponible.</p>
+                    </section>
+
+                    <section class="messages-settings-view" role="tabpanel" id="settingsPanelConversation" aria-labelledby="settingsTabConversation" data-settings-panel="conversation" hidden>
+                      <h4>Gestion de la conversation</h4>
+                      <p class="messages-settings-note">Les messages sont synchronisés avec Supabase. L’historique n’est pas stocké séparément sur cet appareil.</p>
+                      <button class="messages-settings-action" id="exportConversationBtn" type="button">⇩ Exporter la conversation (JSON)</button>
+                      <button class="messages-settings-action is-unavailable" type="button" disabled>🗑️ Effacer l’historique local <span>Indisponible</span></button>
+                      <button class="messages-settings-action is-unavailable" type="button" disabled>📥 Gérer les médias téléchargés <span>Indisponible</span></button>
+                      <p class="messages-settings-scope">Aucune suppression de message n’est effectuée depuis ce panneau.</p>
+                    </section>
+
+                    <section class="messages-settings-view" role="tabpanel" id="settingsPanelAbout" aria-labelledby="settingsTabAbout" data-settings-panel="about" hidden>
+                      <h4>À propos de nous</h4>
+                      <div class="messages-about-stat"><span>Conversation liée depuis</span><strong id="settingsConversationDate">Date indisponible</strong></div>
+                      <div class="messages-about-stat"><span>Messages chargés</span><strong id="settingsMessageCount">0</strong></div>
+                      <div class="messages-about-stat"><span>Photos partagées</span><strong id="settingsSharedPhotoCount">0</strong></div>
+                      <blockquote class="messages-romantic-note">« Chaque message est un petit morceau de notre histoire. »</blockquote>
+                      <p class="messages-settings-scope">Les compteurs reflètent uniquement les messages chargés depuis la conversation.</p>
+                    </section>
+                  </div>
+                </div>
               </div>
             </details>
           </header>
@@ -242,8 +366,8 @@
         <div class="section-stack">
           <div class="feature-card">
             <div class="section-header">
-              <h2>Souvenirs</h2>
-              <button class="btn-primary" id="addMemoryBtn">+ Ajouter</button>
+              <h2 data-i18n="memories.stats">Souvenirs</h2>
+              <button class="btn-primary" id="addMemoryBtn" data-i18n="memories.add">+ Ajouter</button>
             </div>
             <div class="search-bar">
               <input type="search" id="memorySearch" placeholder="Rechercher un souvenir..." aria-label="Rechercher">
@@ -251,16 +375,16 @@
             <div class="memories-list" id="memoriesList"></div>
             <div class="empty-state" id="memoriesEmpty" hidden>
               <span class="empty-icon">📖</span>
-              <p>Aucun souvenir pour l'instant</p>
-              <p class="empty-sub">Commencez à écrire votre histoire !</p>
+              <p data-i18n="memories.empty">Aucun souvenir pour l'instant</p>
+              <p class="empty-sub" data-i18n="memories.emptyHelp">Commencez à écrire votre histoire !</p>
             </div>
           </div>
 
           <div class="feature-card">
             <section id="dates" class="content-panel">
               <div class="section-header">
-                <h2>Dates importantes</h2>
-                <button class="btn-primary" id="addDateBtn">+ Ajouter</button>
+                <h2 data-i18n="memories.importantDates">Dates importantes</h2>
+                <button class="btn-primary" id="addDateBtn" data-i18n="memories.add">+ Ajouter</button>
               </div>
               <div class="dates-grid" id="datesList"></div>
               <div class="empty-state" id="datesEmpty" hidden>
@@ -274,7 +398,7 @@
           <div class="feature-card">
             <section id="timeline" class="content-panel">
               <div class="section-header">
-                <h2>Chronologie de notre histoire</h2>
+                <h2 data-i18n="memories.timeline">Chronologie de notre histoire</h2>
               </div>
               <div class="timeline" id="timelineList"></div>
             </section>
@@ -302,7 +426,7 @@
           <div class="feature-card">
             <section id="stats" class="content-panel">
               <div class="section-header">
-                <h2>Statistiques</h2>
+                <h2 data-i18n="memories.stats">Statistiques</h2>
               </div>
               <div class="stats-grid">
                 <div class="stat-card"><span class="stat-number" id="statDays">0</span><span class="stat-label">Jours ensemble</span></div>
@@ -346,11 +470,11 @@
           <div class="feature-card">
             <div class="section-header">
               <div>
-                <h2>Notre galerie</h2>
-                <p class="media-section-intro">Les instants précieux de notre histoire, réunis au même endroit.</p>
+                <h2 data-i18n="media.gallery">Notre galerie</h2>
+                <p class="media-section-intro" data-i18n="media.galleryIntro">Les instants précieux de notre histoire, réunis au même endroit.</p>
               </div>
               <div class="section-actions">
-                <button class="btn-primary" id="addPhotoBtn">+ Photo</button>
+                <button class="btn-primary" id="addPhotoBtn" data-i18n="media.addPhoto">+ Photo</button>
               </div>
             </div>
             <input type="file" id="galleryInput" accept="image/*" multiple hidden>
@@ -384,10 +508,10 @@
             <section id="playlist" class="content-panel">
               <div class="section-header">
                 <div>
-                  <h2>Notre univers musical</h2>
-                  <p class="media-section-intro">Les mélodies qui accompagnent votre histoire.</p>
+                  <h2 data-i18n="media.music">Notre univers musical</h2>
+                  <p class="media-section-intro" data-i18n="media.musicIntro">Les mélodies qui accompagnent votre histoire.</p>
                 </div>
-                <button class="btn-primary" id="addTrackBtn">+ Ajouter</button>
+                <button class="btn-primary" id="addTrackBtn" data-i18n="media.addTrack">+ Ajouter</button>
               </div>
               <input type="file" id="audioInput" accept=".mp3,.wav,.ogg,.m4a,audio/mpeg,audio/wav,audio/ogg,audio/mp4" multiple hidden>
               <div class="playlist-player" id="playlistPlayer">
@@ -433,7 +557,7 @@
 
               <div class="section-header game-header">
                 <div>
-                  <h2>Action ou Vérité</h2>
+                  <h2 data-i18n="game.truthOrDare">Action ou Vérité</h2>
                   <p class="game-subtitle">Mini-jeu romantique • premium • ultra fun</p>
                 </div>
                 <span class="game-badge">✨ Nouveau</span>
@@ -444,9 +568,9 @@
               </div>
 
               <div class="game-categories" role="group" aria-label="Catégories du jeu">
-                <button class="category-btn active" data-category="romantique">🟢 Romantique</button>
-                <button class="category-btn" data-category="drole">🟡 Drôle</button>
-                <button class="category-btn" data-category="audacieux">🔴 Audacieux</button>
+                <button class="category-btn active" data-category="romantique" data-i18n="game.romantic">🟢 Romantique</button>
+                <button class="category-btn" data-category="drole" data-i18n="game.funny">🟡 Drôle</button>
+                <button class="category-btn" data-category="audacieux" data-i18n="game.bold">🔴 Audacieux</button>
               </div>
 
               <div class="game-wheel-card">
@@ -466,7 +590,7 @@
                 </div>
 
                 <div class="game-controls">
-                  <button class="game-spin-btn" id="spinGameBtn">❤️ FAIRE TOURNER</button>
+                  <button class="game-spin-btn" id="spinGameBtn" data-i18n="game.spin">❤️ FAIRE TOURNER</button>
                   <p class="game-status" id="gameStatus">Catégorie sélectionnée : <span id="selectedCategoryLabel">🟢 Romantique</span></p>
                 </div>
               </div>
@@ -500,14 +624,28 @@
 
           <div class="plus-category-heading">
             <span class="plus-category-icon" aria-hidden="true">✨</span>
-            <div><h2>Préférences de l’application</h2><p>Choisissez l’apparence de votre carnet.</p></div>
+            <div><h2 data-i18n="settings.preferences">Préférences de l’application</h2><p data-i18n="settings.preferencesHelp">Choisissez l’apparence de votre carnet.</p></div>
           </div>
           <div class="feature-card plus-feature-card">
             <section id="settings" class="content-panel plus-settings-panel">
               <div class="plus-subsection plus-personalization">
                 <div class="plus-subsection-heading">
                   <span aria-hidden="true">🎨</span>
-                  <div><h3>Apparence &amp; préférences</h3><p>Personnalisez l’affichage selon vos envies.</p></div>
+                  <div><h3 data-i18n="settings.appearance">Apparence &amp; préférences</h3><p data-i18n="settings.appearanceHelp">Personnalisez l’affichage selon vos envies.</p></div>
+                </div>
+                <div class="form-group plus-language-group">
+                  <label for="languageSelect" data-i18n="settings.language">Langue / Language</label>
+                  <select id="languageSelect" name="language" autocomplete="off" aria-describedby="languageHelp">
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="en">🇬🇧 English</option>
+                    <option value="es">🇪🇸 Español</option>
+                    <option value="pt">🇵🇹 Português</option>
+                    <option value="de">🇩🇪 Deutsch</option>
+                    <option value="it">🇮🇹 Italiano</option>
+                    <option value="ar">🇸🇦 العربية</option>
+                    <option value="zh">🇨🇳 中文</option>
+                  </select>
+                  <p id="languageHelp" class="form-help" data-i18n="settings.languageHelp">Ce choix est enregistré uniquement pour votre appareil et votre profil.</p>
                 </div>
                 <div class="form-group toggle-group plus-nickname-toggle">
                   <label for="showNicknames">Afficher les surnoms à la place des prénoms</label>
@@ -527,16 +665,16 @@
 
           <div class="plus-category-heading">
             <span class="plus-category-icon" aria-hidden="true">⚙</span>
-            <div><h2>Paramètres</h2><p>Gardez une copie des données de votre carnet.</p></div>
+            <div><h2 data-i18n="settings.title">Paramètres</h2><p data-i18n="settings.backupHelp">Gardez une copie des données de votre carnet.</p></div>
           </div>
           <div class="feature-card plus-feature-card">
             <section id="backup" class="content-panel plus-backup-panel">
               <div class="section-header">
-                <div><h2>💾 Sauvegarde &amp; données</h2><p>Exportez ou restaurez les données de l’application.</p></div>
+                <div><h2 data-i18n="settings.backupTitle">💾 Sauvegarde &amp; données</h2><p data-i18n="settings.backupDescription">Exportez ou restaurez les données de l’application.</p></div>
               </div>
               <div class="backup-actions">
-                <button class="btn-primary" id="exportBtn">Exporter JSON</button>
-                <button class="btn-secondary" id="importBtn">Importer JSON</button>
+                <button class="btn-primary" id="exportBtn" data-i18n="settings.export">Exporter JSON</button>
+                <button class="btn-secondary" id="importBtn" data-i18n="settings.import">Importer JSON</button>
                 <input type="file" id="importInput" accept="application/json" hidden>
               </div>
             </section>
@@ -580,8 +718,8 @@
             </select>
           </div>
           <div class="modal-actions">
-            <button type="button" class="btn-secondary" id="cancelMemoryBtn">Annuler</button>
-            <button type="submit" class="btn-primary">Enregistrer</button>
+            <button type="button" class="btn-secondary" id="cancelMemoryBtn" data-i18n="modal.cancel">Annuler</button>
+            <button type="submit" class="btn-primary" data-i18n="modal.save">Enregistrer</button>
           </div>
         </form>
       </div>
@@ -600,8 +738,8 @@
             <input type="date" id="startDate" required>
           </div>
           <div class="modal-actions">
-            <button type="button" class="btn-secondary" id="cancelDateBtn">Annuler</button>
-            <button type="submit" class="btn-primary">Enregistrer</button>
+            <button type="button" class="btn-secondary" id="cancelDateBtn" data-i18n="modal.cancel">Annuler</button>
+            <button type="submit" class="btn-primary" data-i18n="modal.save">Enregistrer</button>
           </div>
         </form>
       </div>
@@ -632,8 +770,8 @@
             <input type="text" id="nickname2" placeholder="Surnom du partenaire">
           </div>
           <div class="modal-actions">
-            <button type="button" class="btn-secondary" id="cancelProfileBtn">Annuler</button>
-            <button type="submit" class="btn-primary">Enregistrer</button>
+            <button type="button" class="btn-secondary" id="cancelProfileBtn" data-i18n="modal.cancel">Annuler</button>
+            <button type="submit" class="btn-primary" data-i18n="modal.save">Enregistrer</button>
           </div>
         </form>
       </div>
@@ -708,6 +846,6 @@
     </div>
   </div>
 
-  <script src="js/script.js?v=20261124j"></script>
+  <script src="js/script.js?v=20261125r"></script>
 </body>
 </html>

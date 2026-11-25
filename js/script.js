@@ -804,6 +804,8 @@ const DEFAULT_SETTINGS = {
 
 const MESSAGE_HEADER_STORAGE_KEY = 'carnet_message_header';
 const PAIRING_STORAGE_KEY = 'carnet_pairing_state';
+const MESSAGE_BACKGROUND_LEGACY_ID = 'conversation-background';
+const MESSAGE_SETTINGS_MIGRATED_KEY = 'carnet_message_settings_migrated';
 
 let currentLightboxId = null;
 let deferredPrompt = null;
@@ -811,6 +813,15 @@ let settingsPhotoDataUrl1 = null;
 let settingsPhotoDataUrl2 = null;
 let onboardingPhotoDataUrl = null;
 let mediaDb = null;
+let messageBackgroundDb = null;
+let messageBackgroundDbPromise = null;
+let messageBackgroundObjectUrl = null;
+let hasStoredMessageBackground = false;
+let pendingMessageBackgroundFile = null;
+let previewMessageBackgroundUrl = null;
+let messageBackgroundLoadId = 0;
+let pendingPartnerAvatarFile = null;
+let previewPartnerAvatarUrl = null;
 let playlistTracks = [];
 let currentTrackIndex = -1;
 let currentAudio = null;
@@ -905,6 +916,115 @@ async function deleteAudioRecord(id) {
   });
 }
 
+function openMessageBackgroundDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error('IndexedDB non pris en charge par ce navigateur.'));
+      return;
+    }
+    const request = indexedDB.open('carnet-message-background-db', 1);
+    request.onupgradeneeded = event => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('backgrounds')) {
+        db.createObjectStore('backgrounds', { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => {
+      messageBackgroundDb = request.result;
+      messageBackgroundDb.onversionchange = () => {
+        messageBackgroundDb.close();
+        messageBackgroundDb = null;
+      };
+      resolve(messageBackgroundDb);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getMessageBackgroundDatabase() {
+  if (messageBackgroundDb) return messageBackgroundDb;
+  if (!messageBackgroundDbPromise) {
+    messageBackgroundDbPromise = openMessageBackgroundDatabase().finally(() => {
+      messageBackgroundDbPromise = null;
+    });
+  }
+  return messageBackgroundDbPromise;
+}
+
+async function saveMessageBackgroundImage(file) {
+  let persistentStorageGranted = false;
+  if (navigator.storage?.persist) {
+    try {
+      persistentStorageGranted = await navigator.storage.persist();
+      if (!persistentStorageGranted) {
+        console.warn('Le navigateur n’a pas accordé le stockage persistant; le fond reste enregistré localement.');
+      }
+    } catch (error) {
+      console.warn('Impossible de demander le stockage persistant pour le fond de discussion.', error);
+    }
+  }
+
+  const db = await getMessageBackgroundDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('backgrounds', 'readwrite');
+    tx.objectStore('backgrounds').put({
+      id: getMessageBackgroundRecordId(),
+      blob: file.slice(0, file.size, file.type || 'application/octet-stream'),
+      name: file.name || 'background-image',
+      type: file.type || 'image/*',
+      updatedAt: Date.now()
+    });
+    tx.oncomplete = () => resolve(persistentStorageGranted);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('Échec de l’enregistrement de l’image.'));
+  });
+}
+
+async function getMessageBackgroundImage() {
+  const db = await getMessageBackgroundDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('backgrounds', 'readwrite');
+    const store = tx.objectStore('backgrounds');
+    let record = null;
+    const request = store.get(getMessageBackgroundRecordId());
+    request.onsuccess = () => {
+      if (request.result) {
+        record = request.result;
+        return;
+      }
+
+      const legacyRequest = store.get(MESSAGE_BACKGROUND_LEGACY_ID);
+      legacyRequest.onsuccess = () => {
+        if (!legacyRequest.result) return;
+        record = { ...legacyRequest.result, id: getMessageBackgroundRecordId() };
+        store.put(record);
+        store.delete(MESSAGE_BACKGROUND_LEGACY_ID);
+      };
+      legacyRequest.onerror = () => reject(legacyRequest.error);
+    };
+    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => resolve(record);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('Échec du chargement de l’image de fond.'));
+  });
+}
+
+async function deleteMessageBackgroundImage() {
+  const db = await getMessageBackgroundDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('backgrounds', 'readwrite');
+    tx.objectStore('backgrounds').delete(getMessageBackgroundRecordId());
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('Échec de la suppression de l’image.'));
+  });
+}
+
+function getMessageBackgroundRecordId() {
+  const myCode = getPairingState().myCode.trim().toUpperCase();
+  return `${MESSAGE_BACKGROUND_LEGACY_ID}:${myCode}`;
+}
+
 function formatMediaTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
   const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -927,14 +1047,57 @@ let activeReplyMessageId = null;
 let activeEditMessageId = null;
 let messageTypingTimer = null;
 let activeMessageView = 'all';
+let activeMessageMediaType = null;
 let isSendingMessage = false;
+const MESSAGE_SETTINGS_DEFAULTS = {
+  background: 'sunset',
+  backgroundMode: 'preset',
+  bubbleColor: 'rose',
+  bubbleStyle: 'soft',
+  theme: DEFAULT_SETTINGS.theme,
+  textSize: 16,
+  reactionSet: 'classic',
+  showTimes: true
+};
+const MESSAGE_REACTION_SETS = {
+  classic: ['❤️', '😂', '😍', '👍'],
+  romantic: ['❤️', '🥰', '😘', '💕'],
+  playful: ['😂', '🤭', '😜', '✨']
+};
 
 function getMessageSettings() {
-  return load(STORAGE_KEYS.messageSettings || 'carnet_message_settings', { background: 'sunset' });
+  const storageKey = getMessageSettingsStorageKey();
+  let stored = load(storageKey, null);
+  if (stored === null) {
+    const legacy = load(STORAGE_KEYS.messageSettings || 'carnet_message_settings', null);
+    if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
+      stored = legacy;
+      localStorage.removeItem(STORAGE_KEYS.messageSettings || 'carnet_message_settings');
+    } else if (!load(MESSAGE_SETTINGS_MIGRATED_KEY, false)) {
+      stored = { ...MESSAGE_SETTINGS_DEFAULTS, theme: getSettings().theme || DEFAULT_SETTINGS.theme };
+    }
+    if (stored) save(storageKey, stored);
+    save(MESSAGE_SETTINGS_MIGRATED_KEY, true);
+  }
+  if (!load(MESSAGE_SETTINGS_MIGRATED_KEY, false)) {
+    save(MESSAGE_SETTINGS_MIGRATED_KEY, true);
+  }
+  return {
+    ...MESSAGE_SETTINGS_DEFAULTS,
+    ...(stored && typeof stored === 'object' ? stored : {})
+  };
+}
+
+function getMessageSettingsStorageKey() {
+  const myCode = getPairingState().myCode.trim().toUpperCase();
+  return `${STORAGE_KEYS.messageSettings}:${myCode}`;
 }
 
 function saveMessageSettings(settings) {
-  save(STORAGE_KEYS.messageSettings || 'carnet_message_settings', settings);
+  const next = { ...getMessageSettings(), ...settings };
+  save(getMessageSettingsStorageKey(), next);
+  applyMessageSettings();
+  return next;
 }
 
 function getMessageHeaderState() {
@@ -1112,13 +1275,409 @@ function updateMessagesPairingUI() {
   }
 }
 
-function applyMessageBackground() {
+function applyMessageSettings() {
   const thread = document.getElementById('modernMessagesList');
   const settings = getMessageSettings();
 
   if (thread) {
-    thread.setAttribute('data-background', settings.background || 'sunset');
+    thread.dataset.background = settings.background;
+    thread.dataset.bubbleColor = settings.bubbleColor;
+    thread.dataset.bubbleStyle = settings.bubbleStyle;
+    thread.dataset.textSize = String(settings.textSize);
+    thread.dataset.showTimes = String(settings.showTimes);
+    thread.style.setProperty('--message-text-size', `${settings.textSize}px`);
+    const shell = thread.closest('.messages-v2-shell');
+    if (shell) shell.dataset.background = settings.background;
+    applyMessageBackgroundToThread(settings);
   }
+
+  document.querySelectorAll('.message-quick-reaction').forEach((button, index) => {
+    const reactions = MESSAGE_REACTION_SETS[settings.reactionSet] || MESSAGE_REACTION_SETS.classic;
+    button.dataset.emoji = reactions[index] || reactions[0];
+    button.textContent = button.dataset.emoji;
+    button.setAttribute('aria-label', `Insérer ${button.dataset.emoji}`);
+  });
+
+  const themeMode = ['dark', 'light', 'auto'].includes(settings.theme) ? settings.theme : DEFAULT_SETTINGS.theme;
+  applyTheme(themeMode, false, false);
+  updateMessageSettingsControls(settings);
+  updateMessageSettingsSummary();
+}
+
+function setMessageThreadBackgroundImage(url) {
+  const shell = document.querySelector('#messages .messages-v2-shell');
+  if (!shell) return;
+  shell.classList.toggle('has-custom-background', !!url);
+  shell.style.backgroundImage = url ? `url("${url}")` : '';
+  if (url) {
+    shell.style.backgroundSize = 'cover';
+    shell.style.backgroundPosition = 'center';
+    shell.style.backgroundRepeat = 'no-repeat';
+  } else {
+    shell.style.removeProperty('background-size');
+    shell.style.removeProperty('background-position');
+    shell.style.removeProperty('background-repeat');
+  }
+}
+
+async function applyMessageBackgroundToThread(settings = getMessageSettings()) {
+  const requestId = ++messageBackgroundLoadId;
+  if (previewMessageBackgroundUrl) {
+    setMessageThreadBackgroundImage(previewMessageBackgroundUrl);
+    return;
+  }
+  if (settings.backgroundMode !== 'image') {
+    setMessageThreadBackgroundImage('');
+    return;
+  }
+  if (messageBackgroundObjectUrl) {
+    setMessageThreadBackgroundImage(messageBackgroundObjectUrl);
+    return;
+  }
+
+  setMessageThreadBackgroundImage('');
+  try {
+    const record = await getMessageBackgroundImage();
+    if (requestId !== messageBackgroundLoadId || getMessageSettings().backgroundMode !== 'image') return;
+    hasStoredMessageBackground = !!record?.blob;
+    if (!record?.blob) {
+      updateMessageBackgroundControls();
+      return;
+    }
+    messageBackgroundObjectUrl = URL.createObjectURL(record.blob);
+    setMessageThreadBackgroundImage(messageBackgroundObjectUrl);
+    updateMessageBackgroundControls();
+  } catch (error) {
+    console.warn('Impossible de charger le fond personnel; le fond prédéfini reste actif.', error);
+  }
+}
+
+async function loadStoredMessageBackgroundState() {
+  if (getMessageSettings().backgroundMode === 'image') return applyMessageBackgroundToThread();
+  try {
+    const record = await getMessageBackgroundImage();
+    hasStoredMessageBackground = !!record?.blob;
+    updateMessageBackgroundControls();
+  } catch (error) {
+    console.warn('Impossible de vérifier le fond personnel enregistré.', error);
+  }
+}
+
+function applyMessageBackground() {
+  applyMessageSettings();
+}
+
+function updateMessageSettingsControls(settings = getMessageSettings()) {
+  const controls = {
+    conversationThemeSelect: settings.theme,
+    messageBubbleColorSelect: settings.bubbleColor,
+    messageBubbleStyleSelect: settings.bubbleStyle,
+    messageTextSize: String(settings.textSize),
+    messageReactionSet: settings.reactionSet
+  };
+  Object.entries(controls).forEach(([id, value]) => {
+    const control = document.getElementById(id);
+    if (control) control.value = value;
+  });
+  const timeToggle = document.getElementById('messageTimeToggle');
+  if (timeToggle) timeToggle.checked = !!settings.showTimes;
+  const sizeValue = document.getElementById('messageTextSizeValue');
+  if (sizeValue) sizeValue.textContent = `${settings.textSize} px`;
+  document.querySelectorAll('[data-message-background]').forEach(button => {
+    const selected = settings.backgroundMode !== 'image' && button.dataset.messageBackground === settings.background;
+    button.classList.toggle('is-selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+  updateMessageBackgroundControls(settings);
+}
+
+function updateMessageBackgroundControls(settings = getMessageSettings()) {
+  const preview = document.getElementById('conversationBackgroundPreview');
+  const previewImage = document.getElementById('conversationBackgroundPreviewImage');
+  const previewLabel = document.getElementById('conversationBackgroundPreviewLabel');
+  const chooseButton = document.getElementById('chooseConversationBackground');
+  const applyButton = document.getElementById('applyConversationBackground');
+  const cancelButton = document.getElementById('cancelConversationBackground');
+  const removeButton = document.getElementById('removeConversationBackground');
+  const previewUrl = previewMessageBackgroundUrl || ((settings.backgroundMode === 'image') ? messageBackgroundObjectUrl : null);
+  const hasPendingImage = !!pendingMessageBackgroundFile && !!previewMessageBackgroundUrl;
+  const hasSavedImage = settings.backgroundMode === 'image' && hasStoredMessageBackground;
+
+  if (preview) preview.hidden = !previewUrl;
+  if (previewImage && previewUrl && previewImage.src !== previewUrl) previewImage.src = previewUrl;
+  if (previewLabel) previewLabel.textContent = hasPendingImage ? 'Aperçu avant validation' : 'Votre fond personnel';
+  if (chooseButton) chooseButton.textContent = hasSavedImage ? '🖼️ Remplacer mon image' : '🖼️ Choisir dans ma galerie';
+  if (applyButton) applyButton.hidden = !hasPendingImage;
+  if (cancelButton) cancelButton.hidden = !hasPendingImage;
+  if (removeButton) removeButton.hidden = !hasStoredMessageBackground && !hasPendingImage;
+}
+
+function getSettingsConversationMessages() {
+  const state = window.MessageModule?.getState?.();
+  return state?.ready ? window.MessageModule.getMessages() : [];
+}
+
+function updateMessageSettingsSummary() {
+  const messages = getSettingsConversationMessages().filter(message => !message.deletedForEveryone && !message.deletedForMe);
+  const counts = {
+    settingsFavoriteCount: messages.filter(message => message.favorite).length,
+    settingsPinnedCount: messages.filter(message => message.pinned).length,
+    settingsPhotoCount: messages.filter(message => message.type === 'image').length,
+    settingsSharedPhotoCount: messages.filter(message => message.type === 'image').length,
+    settingsFileCount: messages.filter(message => ['document', 'music', 'voice'].includes(message.type)).length,
+    settingsVideoCount: messages.filter(message => message.type === 'video').length,
+    settingsLinkCount: messages.filter(message => /https?:\/\//i.test(message.text || '')).length,
+    settingsMessageCount: messages.length
+  };
+  Object.entries(counts).forEach(([id, count]) => {
+    const target = document.getElementById(id);
+    if (target) target.textContent = window.I18n?.formatNumber(count) || String(count);
+  });
+
+  const createdDate = document.getElementById('settingsConversationDate');
+  if (createdDate) createdDate.textContent = 'Date indisponible';
+}
+
+function initMessageSettingsPanel() {
+  const details = document.querySelector('.messages-settings-menu');
+  if (!details) return;
+
+  const tabs = Array.from(details.querySelectorAll('[data-settings-tab]'));
+  const panels = Array.from(details.querySelectorAll('[data-settings-panel]'));
+  const search = document.getElementById('settingsConversationSearch');
+  const legacySearch = document.getElementById('messageSearch');
+  const closeButton = document.getElementById('messagesSettingsClose');
+  const summary = details.querySelector(':scope > summary');
+  const panel = details.querySelector('.messages-settings-panel');
+  const chatHeader = details.closest('.messages-chat-header');
+  const chatIdentity = chatHeader?.querySelector('.messages-chat-identity');
+  let closeTimer = null;
+
+  const closePanel = (returnFocus = false) => {
+    if (!details.open) return;
+    panel?.classList.add('is-closing');
+    window.clearTimeout(closeTimer);
+    closeTimer = window.setTimeout(() => {
+      details.open = false;
+      panel?.classList.remove('is-closing');
+      if (returnFocus) summary?.focus();
+    }, 160);
+  };
+
+  const openPanel = () => {
+    if (details.open) return;
+    details.open = true;
+    updateMessageSettingsSummary();
+  };
+
+  chatHeader?.addEventListener('click', event => {
+    if (event.target.closest('.messages-chat-avatar, .messages-settings-menu, button, a, input, select, textarea')) return;
+    if (!details.open) openPanel();
+  });
+  chatIdentity?.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openPanel();
+  });
+
+  const activateTab = (tab, focus = false) => {
+    const category = tab.dataset.settingsTab;
+    tabs.forEach(item => {
+      const active = item === tab;
+      item.classList.toggle('is-active', active);
+      item.setAttribute('aria-selected', String(active));
+      item.tabIndex = active ? 0 : -1;
+    });
+    panels.forEach(panel => {
+      const active = panel.dataset.settingsPanel === category;
+      panel.hidden = !active;
+      panel.classList.toggle('is-active', active);
+    });
+    if (focus) tab.focus();
+  };
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => activateTab(tab));
+    tab.addEventListener('keydown', event => {
+      const directions = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+      if (!directions[event.key]) return;
+      event.preventDefault();
+      const nextIndex = (index + directions[event.key] + tabs.length) % tabs.length;
+      activateTab(tabs[nextIndex], true);
+    });
+  });
+  if (tabs[0]) activateTab(tabs[0]);
+
+  summary?.addEventListener('click', event => {
+    if (!details.open) return;
+    event.preventDefault();
+    closePanel();
+  });
+  closeButton?.addEventListener('click', () => closePanel(true));
+  details.addEventListener('toggle', () => {
+    if (details.open && !panel?.classList.contains('is-closing')) updateMessageSettingsSummary();
+  });
+  document.addEventListener('pointerdown', event => {
+    if (details.open && !details.contains(event.target)) closePanel();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && details.open) {
+      closePanel(true);
+    }
+  });
+
+  const bindSelect = (id, setting) => {
+    document.getElementById(id)?.addEventListener('change', event => {
+      saveMessageSettings({ [setting]: event.target.value });
+    });
+  };
+  details.querySelectorAll('[data-message-background]').forEach(button => {
+    button.addEventListener('click', () => {
+      if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
+      previewMessageBackgroundUrl = null;
+      pendingMessageBackgroundFile = null;
+      saveMessageSettings({ background: button.dataset.messageBackground, backgroundMode: 'preset' });
+    });
+  });
+
+  const backgroundInput = document.getElementById('conversationBackgroundInput');
+  const chooseBackgroundButton = document.getElementById('chooseConversationBackground');
+  const applyBackgroundButton = document.getElementById('applyConversationBackground');
+  const cancelBackgroundButton = document.getElementById('cancelConversationBackground');
+  const removeBackgroundButton = document.getElementById('removeConversationBackground');
+  chooseBackgroundButton?.addEventListener('click', () => backgroundInput?.click());
+  backgroundInput?.addEventListener('change', () => {
+    const file = backgroundInput.files?.[0];
+    backgroundInput.value = '';
+    if (!file) return;
+    const looksLikeImage = file.type.startsWith('image/') || /\.(avif|gif|jpe?g|png|webp)$/i.test(file.name);
+    if (!looksLikeImage) {
+      showToast('Choisissez un fichier image valide.');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      showToast('Cette image dépasse la limite de 20 Mo.');
+      return;
+    }
+    if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
+    pendingMessageBackgroundFile = file;
+    previewMessageBackgroundUrl = URL.createObjectURL(file);
+    setMessageThreadBackgroundImage(previewMessageBackgroundUrl);
+    updateMessageBackgroundControls();
+  });
+  applyBackgroundButton?.addEventListener('click', async () => {
+    if (!pendingMessageBackgroundFile || !previewMessageBackgroundUrl) return;
+    try {
+      const persistentStorageGranted = await saveMessageBackgroundImage(pendingMessageBackgroundFile);
+      if (messageBackgroundObjectUrl && messageBackgroundObjectUrl !== previewMessageBackgroundUrl) {
+        URL.revokeObjectURL(messageBackgroundObjectUrl);
+      }
+      messageBackgroundObjectUrl = previewMessageBackgroundUrl;
+      previewMessageBackgroundUrl = null;
+      pendingMessageBackgroundFile = null;
+      hasStoredMessageBackground = true;
+      saveMessageSettings({ backgroundMode: 'image' });
+      showToast(persistentStorageGranted
+        ? 'Votre fond personnel est enregistré durablement sur cet appareil.'
+        : 'Votre fond est enregistré localement, mais le navigateur ne garantit pas sa conservation.');
+    } catch (error) {
+      console.error('Échec de l’enregistrement du fond personnel.', error);
+      showToast('Impossible d’enregistrer cette image sur cet appareil.');
+    }
+  });
+  cancelBackgroundButton?.addEventListener('click', () => {
+    if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
+    previewMessageBackgroundUrl = null;
+    pendingMessageBackgroundFile = null;
+    applyMessageSettings();
+  });
+  removeBackgroundButton?.addEventListener('click', async () => {
+    try {
+      await deleteMessageBackgroundImage();
+      if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
+      if (messageBackgroundObjectUrl) URL.revokeObjectURL(messageBackgroundObjectUrl);
+      previewMessageBackgroundUrl = null;
+      messageBackgroundObjectUrl = null;
+      pendingMessageBackgroundFile = null;
+      hasStoredMessageBackground = false;
+      saveMessageSettings({ backgroundMode: 'preset' });
+      showToast('Votre image de fond a été supprimée.');
+    } catch (error) {
+      console.error('Échec de la suppression du fond personnel.', error);
+      showToast('Impossible de supprimer cette image.');
+    }
+  });
+  loadStoredMessageBackgroundState();
+
+  bindSelect('messageBubbleColorSelect', 'bubbleColor');
+  bindSelect('messageBubbleStyleSelect', 'bubbleStyle');
+  bindSelect('messageReactionSet', 'reactionSet');
+  document.getElementById('conversationThemeSelect')?.addEventListener('change', event => {
+    saveSettings({ theme: event.target.value });
+    saveMessageSettings({ theme: event.target.value });
+  });
+  document.getElementById('messageTextSize')?.addEventListener('input', event => {
+    saveMessageSettings({ textSize: Number(event.target.value) });
+  });
+  document.getElementById('messageTimeToggle')?.addEventListener('change', event => {
+    saveMessageSettings({ showTimes: event.target.checked });
+  });
+  document.getElementById('restoreMessageAppearance')?.addEventListener('click', () => {
+    saveSettings({ theme: DEFAULT_SETTINGS.theme });
+    saveMessageSettings({ ...MESSAGE_SETTINGS_DEFAULTS, theme: DEFAULT_SETTINGS.theme });
+    showToast('Apparence de la conversation restaurée.');
+  });
+
+  search?.addEventListener('input', () => {
+    if (legacySearch) legacySearch.value = search.value;
+    activeMessageView = 'all';
+    activeMessageMediaType = null;
+    renderMessages(search.value);
+  });
+  details.querySelectorAll('[data-message-filter]').forEach(button => {
+    button.addEventListener('click', () => {
+      activeMessageView = button.dataset.messageFilter;
+      activeMessageMediaType = null;
+      if (search) search.value = '';
+      if (legacySearch) legacySearch.value = '';
+      document.querySelectorAll('.message-filter-chip').forEach(item => {
+        item.classList.toggle('active', item.dataset.view === activeMessageView);
+      });
+      renderMessages();
+      closePanel();
+    });
+  });
+  details.querySelectorAll('[data-media-filter]').forEach(button => {
+    button.addEventListener('click', () => {
+      if (button.disabled) return;
+      activeMessageView = 'all';
+      activeMessageMediaType = button.dataset.mediaFilter === 'document' ? 'file' : button.dataset.mediaFilter;
+      if (search) search.value = '';
+      if (legacySearch) legacySearch.value = '';
+      renderMessages();
+      closePanel();
+    });
+  });
+
+  document.getElementById('exportConversationBtn')?.addEventListener('click', () => {
+    const state = window.MessageModule?.getState?.();
+    if (!state?.ready || !state.conversationCode) {
+      showToast('La conversation n’est pas encore chargée.');
+      return;
+    }
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      messages: getSettingsConversationMessages().filter(message => !message.deletedForEveryone && !message.deletedForMe)
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `notre-carnet-conversation-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  applyMessageSettings();
 }
 
 function normalizeMessage(message, index = 0) {
@@ -1151,7 +1710,7 @@ function normalizeMessage(message, index = 0) {
     text: message.text || message.title || '',
     type: message.type || 'text',
     createdAt,
-    time: message.time || new Date(createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    time: message.time || new Date(createdAt).toLocaleTimeString(window.I18n?.getLocale() || 'fr-FR', { hour: '2-digit', minute: '2-digit' }),
     status: message.status || (sender === 'me' ? 'read' : 'sent'),
     reactions: message.reactions || {},
     pinned: !!message.pinned,
@@ -1221,6 +1780,8 @@ function renderMessages(filter = '', sortValue = 'date_desc') {
 
   if (thread) {
     thread.setAttribute('data-background', settings.background || 'sunset');
+    const shell = thread.closest('.messages-v2-shell');
+    if (shell) shell.dataset.background = settings.background || 'sunset';
   }
 
   const visible = messages
@@ -1229,6 +1790,8 @@ function renderMessages(filter = '', sortValue = 'date_desc') {
       if (message.deletedForMe && message.sender === 'me') return false;
       if (activeMessageView === 'favorites' && !message.favorite) return false;
       if (activeMessageView === 'pinned' && !message.pinned) return false;
+      if (activeMessageMediaType === 'file' && !['document', 'music', 'voice'].includes(message.type)) return false;
+      if (activeMessageMediaType && activeMessageMediaType !== 'file' && message.type !== activeMessageMediaType) return false;
       if (!searchValue) return true;
       const haystack = `${message.text || ''} ${message.metadata?.name || ''} ${message.author || ''}`.toLowerCase();
       return haystack.includes(searchValue);
@@ -1916,8 +2479,13 @@ function bindEnterToFormSubmit(form) {
 function initMessageProfilePhotos() {
   const avatarPrimary = document.getElementById('messageAvatarPrimary');
   const avatarSecondary = document.getElementById('messageAvatarSecondary');
+  const partnerAvatar = document.getElementById('messagePartnerAvatar');
   const inputPrimary = document.getElementById('messagePhotoInputPrimary');
   const inputSecondary = document.getElementById('messagePhotoInputSecondary');
+  const previewDialog = document.getElementById('messageAvatarPreviewDialog');
+  const previewImage = document.getElementById('messageAvatarPreviewImage');
+  const cancelPreview = document.getElementById('cancelMessageAvatarPreview');
+  const confirmPhoto = document.getElementById('confirmMessageAvatarPhoto');
 
   const applyHeaderPhoto = (role, dataUrl) => {
     if (!dataUrl) return;
@@ -1944,16 +2512,57 @@ function initMessageProfilePhotos() {
     });
   }
 
-  if (avatarSecondary && inputSecondary) {
-    avatarSecondary.addEventListener('click', () => inputSecondary.click());
+  if ((avatarSecondary || partnerAvatar) && inputSecondary) {
+    const openPartnerPhotoPicker = () => inputSecondary.click();
+    avatarSecondary?.addEventListener('click', openPartnerPhotoPicker);
+    partnerAvatar?.addEventListener('click', openPartnerPhotoPicker);
+    partnerAvatar?.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      openPartnerPhotoPicker();
+    });
     inputSecondary.addEventListener('change', (event) => {
       const file = event.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (e) => applyHeaderPhoto('secondary', e.target.result);
-      reader.onerror = () => showToast('Impossible de lire cette image.');
-      reader.readAsDataURL(file);
       inputSecondary.value = '';
+      if (!file) return;
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const allowedExtensions = /\.(jpe?g|png|webp)$/i;
+      if (!allowedTypes.includes(file.type.toLowerCase()) && !allowedExtensions.test(file.name)) {
+        showToast('Choisissez une image JPG, JPEG, PNG ou WEBP.');
+        return;
+      }
+      if (file.size > 4 * 1024 * 1024) {
+        showToast('Cette image dépasse la limite de 4 Mo.');
+        return;
+      }
+      if (previewPartnerAvatarUrl) URL.revokeObjectURL(previewPartnerAvatarUrl);
+      pendingPartnerAvatarFile = file;
+      previewPartnerAvatarUrl = URL.createObjectURL(file);
+      if (previewImage) previewImage.src = previewPartnerAvatarUrl;
+      if (previewDialog?.showModal) previewDialog.showModal();
+    });
+    const discardPreview = () => {
+      if (previewPartnerAvatarUrl) URL.revokeObjectURL(previewPartnerAvatarUrl);
+      previewPartnerAvatarUrl = null;
+      pendingPartnerAvatarFile = null;
+      if (previewImage) previewImage.removeAttribute('src');
+      if (previewDialog?.open) previewDialog.close();
+    };
+    cancelPreview?.addEventListener('click', discardPreview);
+    previewDialog?.addEventListener('cancel', event => {
+      event.preventDefault();
+      discardPreview();
+    });
+    confirmPhoto?.addEventListener('click', () => {
+      if (!pendingPartnerAvatarFile) return;
+      const reader = new FileReader();
+      reader.onload = event => {
+        applyHeaderPhoto('secondary', event.target.result);
+        discardPreview();
+        showToast('Photo de profil mise à jour sur cet appareil.');
+      };
+      reader.onerror = () => showToast('Impossible de lire cette image.');
+      reader.readAsDataURL(pendingPartnerAvatarFile);
     });
   }
 }
@@ -2014,13 +2623,14 @@ async function initMessages() {
   }
 
   const updateMessagesViewportHeight = () => {
-    if (window.visualViewport) {
-      document.documentElement.style.setProperty('--messages-visual-height', `${window.visualViewport.height}px`);
-    }
+    const viewport = window.visualViewport;
+    document.documentElement.style.setProperty('--messages-visual-height', `${viewport?.height || window.innerHeight}px`);
+    document.documentElement.style.setProperty('--messages-visual-offset-top', `${viewport?.offsetTop || 0}px`);
   };
   updateMessagesViewportHeight();
   window.visualViewport?.addEventListener('resize', updateMessagesViewportHeight);
   window.visualViewport?.addEventListener('scroll', updateMessagesViewportHeight);
+  window.addEventListener('resize', updateMessagesViewportHeight);
 
   if (search) {
     search.addEventListener('input', (e) => renderMessages(e.target.value));
@@ -2174,7 +2784,7 @@ async function initMessages() {
         await window.MessageModule.initialize();
       }
     }
-    if (event.key === STORAGE_KEYS.messageSettings) {
+    if (event.key === getMessageSettingsStorageKey() || event.key === STORAGE_KEYS.messageSettings) {
       applyMessageBackground();
     }
   });
@@ -2183,6 +2793,7 @@ async function initMessages() {
   updateComposerState();
   updateMessageHeader();
   applyMessageBackground();
+  initMessageSettingsPanel();
   updateMessagesPairingUI();
 
   if (window.MessageModule && typeof window.MessageModule.initialize === 'function') {
@@ -2194,9 +2805,11 @@ async function initMessages() {
       renderMessages();
       renderTimeline();
       updateStats();
+      updateMessageSettingsSummary();
     });
   }
 
+  updateMessageSettingsSummary();
   renderMessages();
 }
 
@@ -2270,7 +2883,7 @@ function initBackup() {
         if (payload.memories) save(STORAGE_KEYS.memories, payload.memories);
         if (payload.gallery) save(STORAGE_KEYS.gallery, payload.gallery);
         if (payload.messages) save(STORAGE_KEYS.messages, payload.messages);
-        if (payload.messageSettings) save(STORAGE_KEYS.messageSettings, payload.messageSettings);
+        if (payload.messageSettings) saveMessageSettings(payload.messageSettings);
         if (payload.dates) save(STORAGE_KEYS.dates, payload.dates);
         if (payload.goals) save(STORAGE_KEYS.goals, payload.goals);
         if (payload.challenge) save(STORAGE_KEYS.challenge, payload.challenge);
@@ -2464,13 +3077,19 @@ function updateCounter(startDate) {
   const diff = Math.floor((now - start) / (1000 * 60 * 60 * 24));
   const days = Math.max(0, diff);
 
-  document.getElementById('daysCounter').textContent = days.toLocaleString('fr-FR');
+  document.getElementById('daysCounter').textContent = window.I18n?.formatNumber(days) || days.toLocaleString('fr-FR');
 
   const years = Math.floor(days / 365);
   const months = Math.floor((days % 365) / 30);
-  let sub = 'jours de bonheur';
-  if (years > 0) sub += ` · ${years} an${years > 1 ? 's' : ''}`;
-  if (months > 0) sub += ` · ${months} mois`;
+  let sub = window.I18n?.t('home.happyDays') || 'jours de bonheur';
+  if (years > 0) {
+    const unit = window.I18n?.t(years === 1 ? 'time.year.one' : 'time.year.other') || (years === 1 ? 'an' : 'ans');
+    sub += ` · ${window.I18n?.formatNumber(years) || years} ${unit}`;
+  }
+  if (months > 0) {
+    const unit = window.I18n?.t(months === 1 ? 'time.month.one' : 'time.month.other') || 'mois';
+    sub += ` · ${window.I18n?.formatNumber(months) || months} ${unit}`;
+  }
   document.getElementById('counterSub').textContent = sub;
   document.getElementById('statYears').textContent = years;
 }
@@ -3557,6 +4176,8 @@ function formatDate(dateStr) {
 /* ===== Init ===== */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  await window.I18n?.init();
+  window.addEventListener('carnet:languagechange', () => updateCounter(getSettings().startDate));
   initTheme();
   initSettings();
   initEditableFields();
