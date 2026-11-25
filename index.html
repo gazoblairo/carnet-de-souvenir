@@ -31,7 +31,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
   <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=20261125o">
+  <link rel="stylesheet" href="css/style.css?v=20261125p">
 </head>
 <body>
   <div id="app">
@@ -595,15 +595,22 @@
                 </div>
               </div>
 
-              <div class="game-result-card" id="gameResultCard" hidden>
-                <div class="game-result-badge" id="gameResultBadge">❤️ Action</div>
-                <h3 id="gameResultTitle">Votre défi</h3>
-                <p class="game-result-love" id="gameResultLove"></p>
-                <p id="gameResultText">Choisissez une catégorie et lancez la roue.</p>
-                <div class="game-result-meta">
-                  <span id="gameResultCategory">🟢 Romantique</span>
+              <dialog class="game-result-dialog" id="gameResultDialog" aria-labelledby="gameResultTitle">
+                <div class="game-result-card" id="gameResultCard" hidden>
+                  <button class="game-result-close" id="gameResultClose" type="button" aria-label="Fermer le résultat">×</button>
+                  <div class="game-result-badge" id="gameResultBadge">❤️ Action</div>
+                  <h3 id="gameResultTitle">Votre défi</h3>
+                  <p class="game-result-love" id="gameResultLove"></p>
+                  <p id="gameResultText">Choisissez une catégorie et lancez la roue.</p>
+                  <div class="game-result-meta">
+                    <span id="gameResultCategory">🟢 Romantique</span>
+                  </div>
+                  <div class="game-result-actions">
+                    <button class="btn-secondary" id="gameResultCloseAction" type="button">Fermer</button>
+                    <button class="btn-primary" id="gameResultReplay" type="button">❤️ Rejouer</button>
+                  </div>
                 </div>
-              </div>
+              </dialog>
             </div>
           </div>
 
@@ -846,6 +853,6 @@
     </div>
   </div>
 
-  <script src="js/script.js?v=20261125u"></script>
+  <script src="js/script.js?v=20261125v"></script>
 </body>
 </html>

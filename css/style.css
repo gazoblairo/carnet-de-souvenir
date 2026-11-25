@@ -5226,18 +5226,125 @@ body.messages-open .navbar {
 }
 
 #jeux .game-result-card {
-  padding: clamp(1rem, 3vw, 1.5rem);
+  position: relative;
+  width: 100%;
+  max-height: min(80dvh, 680px);
+  margin: 0;
+  padding: clamp(1.5rem, 5vw, 2.5rem);
   border-color: rgba(255, 134, 184, 0.35);
   background:
     radial-gradient(circle at 8% 0%, rgba(255, 255, 255, 0.68), transparent 38%),
     linear-gradient(135deg, rgba(255, 94, 138, 0.2), rgba(181, 111, 229, 0.16));
   box-shadow: 0 14px 36px rgba(176, 67, 132, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  overflow: auto;
+  text-align: center;
 }
 
 [data-theme="dark"] #jeux .game-result-card {
   background:
     radial-gradient(circle at 8% 0%, rgba(255, 255, 255, 0.1), transparent 38%),
     linear-gradient(135deg, rgba(255, 72, 143, 0.19), rgba(150, 100, 220, 0.18));
+}
+
+#jeux .game-result-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(560px, calc(100vw - 2rem));
+  max-width: none;
+  max-height: min(84dvh, 720px);
+  margin: auto;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: calc(var(--radius) + 8px);
+  background: transparent;
+  color: var(--text);
+}
+
+#jeux .game-result-dialog::backdrop {
+  background: rgba(21, 10, 32, 0.72);
+  backdrop-filter: blur(9px);
+  animation: resultBackdropIn 260ms ease both;
+}
+
+#jeux .game-result-badge {
+  margin: 0 auto 0.85rem;
+}
+
+#jeux .game-result-dialog h3 {
+  padding: 0 1.6rem;
+  font-family: var(--font-display, Georgia, serif);
+  font-size: clamp(1.6rem, 5vw, 2.25rem);
+  letter-spacing: 0.01em;
+}
+
+#jeux .game-result-dialog #gameResultText {
+  margin: 0.75rem auto;
+  font-size: clamp(1.08rem, 3.5vw, 1.35rem);
+  font-weight: 700;
+  line-height: 1.65;
+}
+
+#jeux .game-result-close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.8rem;
+  z-index: 1;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgba(255, 134, 184, 0.28);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  font-size: 1.7rem;
+  cursor: pointer;
+}
+
+#jeux .game-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.35rem;
+}
+
+#jeux .game-result-actions button {
+  min-height: 48px;
+  padding: 0.75rem 1.25rem;
+}
+
+#jeux .confetti-burst {
+  z-index: 2;
+  overflow: visible;
+}
+
+#jeux .result-sparkle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  color: #fff3bb;
+  font-size: 1.25rem;
+  text-shadow: 0 0 9px #fff, 0 0 22px #ff8db8;
+  animation: resultSparkleBurst 950ms cubic-bezier(0.15, 0.7, 0.25, 1) both;
+}
+
+@keyframes resultSparkleBurst {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--spark-angle)) translateX(0) scale(0.3);
+  }
+  25% { opacity: 1; }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--spark-angle)) translateX(var(--spark-distance)) scale(1.15);
+  }
+}
+
+@keyframes resultBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 #jeux .game-result-love {
@@ -5309,6 +5416,20 @@ body.messages-open .navbar {
     padding: 0.62rem 0.78rem;
     font-size: 0.86rem;
   }
+
+  #jeux .game-result-dialog {
+    width: calc(100vw - 1.25rem);
+    max-height: calc(100dvh - 1.25rem);
+  }
+
+  #jeux .game-result-card {
+    max-height: calc(100dvh - 1.25rem);
+    padding: 1.35rem 1rem 1.15rem;
+  }
+
+  #jeux .game-result-actions {
+    gap: 0.55rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5316,8 +5437,13 @@ body.messages-open .navbar {
   #jeux .particle,
   #jeux .wheel-center,
   #jeux .wheel-sparkle,
+  #jeux .result-sparkle,
   #jeux .wheel-wrapper.is-spinning .wheel-pointer,
   #jeux .game-result-card.show {
+    animation: none;
+  }
+
+  #jeux .game-result-dialog::backdrop {
     animation: none;
   }
 

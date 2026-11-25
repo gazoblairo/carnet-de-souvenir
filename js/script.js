@@ -540,16 +540,15 @@ function pickGameItem(category, isAction) {
   return source[Math.floor(Math.random() * source.length)];
 }
 
-function createConfettiBurst() {
+function createConfettiBurst(container) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const shell = document.querySelector('.game-shell');
-  if (!shell) return;
+  if (!container) return;
 
   const burst = document.createElement('div');
   burst.className = 'confetti-burst';
   const colors = ['#ff5e8a', '#ffd166', '#7ee787', '#8f7fff', '#44c4ff', '#ff7b54'];
 
-  for (let i = 0; i < 24; i += 1) {
+  for (let i = 0; i < 20; i += 1) {
     const piece = document.createElement('span');
     piece.className = 'confetti-piece';
     piece.style.setProperty('--confetti-color', colors[i % colors.length]);
@@ -560,7 +559,17 @@ function createConfettiBurst() {
     burst.appendChild(piece);
   }
 
-  shell.appendChild(burst);
+  for (let i = 0; i < 10; i += 1) {
+    const sparkle = document.createElement('span');
+    sparkle.className = 'result-sparkle';
+    sparkle.textContent = i % 2 === 0 ? '✦' : '·';
+    sparkle.style.setProperty('--spark-angle', `${i * 36}deg`);
+    sparkle.style.setProperty('--spark-distance', `${48 + (i % 3) * 18}px`);
+    sparkle.style.animationDelay = `${i * 35}ms`;
+    burst.appendChild(sparkle);
+  }
+
+  container.appendChild(burst);
   setTimeout(() => burst.remove(), 1400);
 }
 
@@ -594,6 +603,7 @@ function spinWheel(category, direction = 1) {
   if (activeGameSpin) return;
   const wheel = document.getElementById('gameWheel');
   const wrapper = document.getElementById('wheelWrapper');
+  const resultDialog = document.getElementById('gameResultDialog');
   const resultCard = document.getElementById('gameResultCard');
   const resultBadge = document.getElementById('gameResultBadge');
   const resultTitle = document.getElementById('gameResultTitle');
@@ -604,7 +614,7 @@ function spinWheel(category, direction = 1) {
   const selectedLabel = document.getElementById('selectedCategoryLabel');
   const spinButton = document.getElementById('spinGameBtn');
   const categoryButtons = document.querySelectorAll('.category-btn');
-  if (!wheel || !wrapper || !resultCard || !spinButton) return;
+  if (!wheel || !wrapper || !resultDialog || !resultCard || !spinButton) return;
 
   const state = getGameState();
   const pool = getGamePool(category);
@@ -626,13 +636,47 @@ function spinWheel(category, direction = 1) {
   const targetRotation = baseRotation + spinDirection * spinTurns * 360 + alignmentDelta;
 
   activeGameSpin = true;
+  resultCard.classList.remove('show');
+  resultCard.hidden = true;
+  let completionTimer;
+  const finishSpin = () => {
+    window.clearTimeout(completionTimer);
+    wheel.removeEventListener('transitionend', onWheelTransitionEnd);
+
+    const recent = state.recent || [];
+    const updatedRecent = [chosen, ...recent].slice(0, GAME_HISTORY_LIMIT);
+    state.recent = updatedRecent;
+    saveGameState(state);
+
+    wrapper.classList.remove('is-spinning');
+    wheel.classList.remove('is-spinning');
+
+    resultBadge.textContent = isAction ? '❤️ Action' : '💬 Vérité';
+    resultTitle.textContent = isAction ? 'Action choisie' : 'Vérité choisie';
+    if (resultLove) resultLove.textContent = getGameLoveMessage();
+    resultText.textContent = chosen;
+    resultCategory.textContent = pool.label;
+    selectedLabel.textContent = pool.label;
+    status.innerHTML = `Catégorie sélectionnée : <span id="selectedCategoryLabel">${pool.label}</span>`;
+    resultCard.hidden = false;
+    resultCard.classList.add('show');
+    createConfettiBurst(resultDialog);
+    resultDialog.showModal();
+    activeGameSpin = false;
+    categoryButtons.forEach(button => { button.disabled = false; });
+    spinButton.disabled = false;
+    spinButton.textContent = '❤️ FAIRE TOURNER';
+  };
+  const onWheelTransitionEnd = event => {
+    if (event.target === wheel && event.propertyName === 'transform') finishSpin();
+  };
+  wheel.addEventListener('transitionend', onWheelTransitionEnd);
   wheel.dataset.rotation = String(targetRotation);
   wheel.style.setProperty('--wheel-spin-duration', `${spinDuration}ms`);
   wheel.style.transform = `rotate(${targetRotation}deg)`;
   wrapper.classList.add('is-spinning');
   wheel.classList.add('is-spinning');
   categoryButtons.forEach(button => { button.disabled = true; });
-  resultCard.hidden = true;
   status.innerHTML = 'Roulette en mouvement…';
   spinButton.disabled = true;
   spinButton.textContent = '✨ Roue en mouvement…';
@@ -643,32 +687,7 @@ function spinWheel(category, direction = 1) {
     }, Math.round(spinDuration * 0.62));
   }
 
-  window.setTimeout(() => {
-    const recent = state.recent || [];
-    const updatedRecent = [chosen, ...recent].slice(0, GAME_HISTORY_LIMIT);
-    state.recent = updatedRecent;
-    saveGameState(state);
-
-    wrapper.classList.remove('is-spinning');
-    wheel.classList.remove('is-spinning');
-    createConfettiBurst();
-
-    resultBadge.textContent = isAction ? '❤️ Action' : '💬 Vérité';
-    resultTitle.textContent = isAction ? 'Action choisie' : 'Vérité choisie';
-    if (resultLove) resultLove.textContent = getGameLoveMessage();
-    resultText.textContent = chosen;
-    resultCategory.textContent = pool.label;
-    selectedLabel.textContent = pool.label;
-    status.innerHTML = `Catégorie sélectionnée : <span id="selectedCategoryLabel">${pool.label}</span>`;
-    resultCard.hidden = false;
-    resultCard.classList.remove('show');
-    void resultCard.offsetWidth;
-    resultCard.classList.add('show');
-    activeGameSpin = false;
-    categoryButtons.forEach(button => { button.disabled = false; });
-    spinButton.disabled = false;
-    spinButton.textContent = '❤️ FAIRE TOURNER';
-  }, spinDuration + 80);
+  completionTimer = window.setTimeout(finishSpin, spinDuration + 1000);
 }
 
 function renderGameHistory() {
@@ -687,6 +706,9 @@ function renderGameHistory() {
 function initGame() {
   const categoryButtons = document.querySelectorAll('.category-btn');
   const spinButton = document.getElementById('spinGameBtn');
+  const resultDialog = document.getElementById('gameResultDialog');
+  const resultCard = document.getElementById('gameResultCard');
+  const closeResult = () => resultDialog.close();
   const selectedLabel = document.getElementById('selectedCategoryLabel');
   const wheel = document.getElementById('gameWheel');
   const wrapper = document.getElementById('wheelWrapper');
@@ -705,6 +727,20 @@ function initGame() {
 
   spinButton.addEventListener('click', () => {
     spinWheel(currentCategory);
+  });
+
+  document.getElementById('gameResultClose').addEventListener('click', closeResult);
+  document.getElementById('gameResultCloseAction').addEventListener('click', closeResult);
+  document.getElementById('gameResultReplay').addEventListener('click', () => {
+    closeResult();
+    spinWheel(currentCategory);
+  });
+  resultDialog.addEventListener('click', event => {
+    if (event.target === resultDialog) closeResult();
+  });
+  resultDialog.addEventListener('close', () => {
+    resultCard.hidden = true;
+    resultCard.classList.remove('show');
   });
 
   wheel.addEventListener('pointerdown', event => {
