@@ -820,6 +820,8 @@ let hasStoredMessageBackground = false;
 let pendingMessageBackgroundFile = null;
 let previewMessageBackgroundUrl = null;
 let messageBackgroundLoadId = 0;
+let messageBackgroundSelectionId = 0;
+let messageBackgroundSaving = false;
 let pendingPartnerAvatarFile = null;
 let previewPartnerAvatarUrl = null;
 let playlistTracks = [];
@@ -951,7 +953,7 @@ async function getMessageBackgroundDatabase() {
   return messageBackgroundDbPromise;
 }
 
-async function saveMessageBackgroundImage(file) {
+async function saveMessageBackgroundImage(file, selectionId, recordId) {
   let persistentStorageGranted = false;
   if (navigator.storage?.persist) {
     try {
@@ -964,29 +966,38 @@ async function saveMessageBackgroundImage(file) {
     }
   }
 
+  if (selectionId !== messageBackgroundSelectionId) {
+    return { saved: false, persistentStorageGranted, recordId };
+  }
+
   const db = await getMessageBackgroundDatabase();
+  if (selectionId !== messageBackgroundSelectionId) {
+    return { saved: false, persistentStorageGranted, recordId };
+  }
+
   return new Promise((resolve, reject) => {
     const tx = db.transaction('backgrounds', 'readwrite');
     tx.objectStore('backgrounds').put({
-      id: getMessageBackgroundRecordId(),
+      id: recordId,
       blob: file.slice(0, file.size, file.type || 'application/octet-stream'),
       name: file.name || 'background-image',
       type: file.type || 'image/*',
       updatedAt: Date.now()
     });
-    tx.oncomplete = () => resolve(persistentStorageGranted);
+    tx.oncomplete = () => resolve({ saved: true, persistentStorageGranted, recordId });
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('Échec de l’enregistrement de l’image.'));
   });
 }
 
 async function getMessageBackgroundImage() {
+  const recordId = getMessageBackgroundRecordId();
   const db = await getMessageBackgroundDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction('backgrounds', 'readwrite');
     const store = tx.objectStore('backgrounds');
     let record = null;
-    const request = store.get(getMessageBackgroundRecordId());
+    const request = store.get(recordId);
     request.onsuccess = () => {
       if (request.result) {
         record = request.result;
@@ -996,7 +1007,7 @@ async function getMessageBackgroundImage() {
       const legacyRequest = store.get(MESSAGE_BACKGROUND_LEGACY_ID);
       legacyRequest.onsuccess = () => {
         if (!legacyRequest.result) return;
-        record = { ...legacyRequest.result, id: getMessageBackgroundRecordId() };
+        record = { ...legacyRequest.result, id: recordId };
         store.put(record);
         store.delete(MESSAGE_BACKGROUND_LEGACY_ID);
       };
@@ -1010,10 +1021,11 @@ async function getMessageBackgroundImage() {
 }
 
 async function deleteMessageBackgroundImage() {
+  const recordId = getMessageBackgroundRecordId();
   const db = await getMessageBackgroundDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction('backgrounds', 'readwrite');
-    tx.objectStore('backgrounds').delete(getMessageBackgroundRecordId());
+    tx.objectStore('backgrounds').delete(recordId);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('Échec de la suppression de l’image.'));
@@ -1145,7 +1157,10 @@ function updateMessageHeader() {
   }
 
   if (subtitle) {
-    const detail = nickname2 ? `${nickname2} • en ligne` : 'En ligne • prêt à s’écrire';
+    const onlineLabel = window.I18n?.t('chat.online') || 'en ligne';
+    const detail = nickname2
+      ? `${nickname2} • ${onlineLabel}`
+      : window.I18n?.t('chat.onlineReady') || 'En ligne • prêt à s’écrire';
     subtitle.textContent = detail;
   }
 
@@ -1217,8 +1232,9 @@ function updateMessagesPairingUI() {
 
   if (pairingStatus) {
     pairingStatus.textContent = isLinked
-      ? `✅ Compte lié à ${state.partnerCode || 'votre partenaire'} — la messagerie est prête.`
-      : 'Vous devez d\'abord inviter ou rejoindre votre partenaire pour utiliser les messages.';
+      ? (window.I18n?.t('chat.linkedStatus') || '✅ Compte lié à {code} — la messagerie est prête.')
+        .replace('{code}', state.partnerCode || 'votre partenaire')
+      : window.I18n?.t('chat.pairingGate') || 'Vous devez d\'abord inviter ou rejoindre votre partenaire pour utiliser les messages.';
   }
 
   if (pairingJoinSection) {
@@ -1228,7 +1244,8 @@ function updateMessagesPairingUI() {
   if (pairingCodeDisplay) {
     pairingCodeDisplay.hidden = isLinked;
     if (!isLinked) {
-      pairingCodeDisplay.innerHTML = `<strong>Code d’invitation</strong><div>${state.myCode}</div>`;
+      const invitationLabel = window.I18n?.t('chat.invitationCode') || 'Code d’invitation';
+      pairingCodeDisplay.innerHTML = `<strong>${escapeHtml(invitationLabel)}</strong><div>${escapeHtml(state.myCode)}</div>`;
     }
   }
 
@@ -1405,8 +1422,13 @@ function updateMessageBackgroundControls(settings = getMessageSettings()) {
 
   if (preview) preview.hidden = !previewUrl;
   if (previewImage && previewUrl && previewImage.src !== previewUrl) previewImage.src = previewUrl;
-  if (previewLabel) previewLabel.textContent = hasPendingImage ? 'Aperçu avant validation' : 'Votre fond personnel';
-  if (chooseButton) chooseButton.textContent = hasSavedImage ? '🖼️ Remplacer mon image' : '🖼️ Choisir dans ma galerie';
+  if (previewLabel) {
+    previewLabel.textContent = messageBackgroundSaving
+      ? window.I18n?.t('chat.backgroundSaving') || 'Enregistrement de votre image…'
+      : window.I18n?.t('chat.backgroundPreview') || 'Votre fond personnel';
+  }
+  if (chooseButton) chooseButton.textContent = window.I18n?.t(hasSavedImage ? 'chat.backgroundReplace' : 'chat.backgroundChoose')
+    || (hasSavedImage ? '🖼️ Remplacer mon image' : '🖼️ Choisir dans ma galerie');
   if (applyButton) applyButton.hidden = !hasPendingImage;
   if (cancelButton) cancelButton.hidden = !hasPendingImage;
   if (removeButton) removeButton.hidden = !hasStoredMessageBackground && !hasPendingImage;
@@ -1435,7 +1457,7 @@ function updateMessageSettingsSummary() {
   });
 
   const createdDate = document.getElementById('settingsConversationDate');
-  if (createdDate) createdDate.textContent = 'Date indisponible';
+  if (createdDate) createdDate.textContent = window.I18n?.t('chat.dateUnavailable') || 'Date indisponible';
 }
 
 function initMessageSettingsPanel() {
@@ -1533,6 +1555,8 @@ function initMessageSettingsPanel() {
   };
   details.querySelectorAll('[data-message-background]').forEach(button => {
     button.addEventListener('click', () => {
+      messageBackgroundSelectionId += 1;
+      messageBackgroundSaving = false;
       if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
       previewMessageBackgroundUrl = null;
       pendingMessageBackgroundFile = null;
@@ -1542,56 +1566,62 @@ function initMessageSettingsPanel() {
 
   const backgroundInput = document.getElementById('conversationBackgroundInput');
   const chooseBackgroundButton = document.getElementById('chooseConversationBackground');
-  const applyBackgroundButton = document.getElementById('applyConversationBackground');
-  const cancelBackgroundButton = document.getElementById('cancelConversationBackground');
   const removeBackgroundButton = document.getElementById('removeConversationBackground');
   chooseBackgroundButton?.addEventListener('click', () => backgroundInput?.click());
-  backgroundInput?.addEventListener('change', () => {
+  backgroundInput?.addEventListener('change', async () => {
     const file = backgroundInput.files?.[0];
     backgroundInput.value = '';
     if (!file) return;
-    const looksLikeImage = file.type.startsWith('image/') || /\.(avif|gif|jpe?g|png|webp)$/i.test(file.name);
+    const looksLikeImage = (file.type || '').startsWith('image/') || /\.(avif|gif|jpe?g|png|webp)$/i.test(file.name);
     if (!looksLikeImage) {
-      showToast('Choisissez un fichier image valide.');
+      showToast(window.I18n?.t('chat.backgroundInvalid') || 'Choisissez un fichier image valide.');
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
-      showToast('Cette image dépasse la limite de 20 Mo.');
+      showToast(window.I18n?.t('chat.backgroundTooLarge') || 'Cette image dépasse la limite de 20 Mo.');
       return;
     }
+    const selectionId = ++messageBackgroundSelectionId;
+    const recordId = getMessageBackgroundRecordId();
     if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
-    pendingMessageBackgroundFile = file;
+    pendingMessageBackgroundFile = null;
     previewMessageBackgroundUrl = URL.createObjectURL(file);
+    messageBackgroundSaving = true;
     setMessageThreadBackgroundImage(previewMessageBackgroundUrl);
     updateMessageBackgroundControls();
-  });
-  applyBackgroundButton?.addEventListener('click', async () => {
-    if (!pendingMessageBackgroundFile || !previewMessageBackgroundUrl) return;
     try {
-      const persistentStorageGranted = await saveMessageBackgroundImage(pendingMessageBackgroundFile);
+      const saveResult = await saveMessageBackgroundImage(file, selectionId, recordId);
+      if (selectionId !== messageBackgroundSelectionId || !saveResult.saved) return;
+      if (recordId !== getMessageBackgroundRecordId()) {
+        throw new Error('Le profil a changé pendant l’enregistrement de l’image.');
+      }
       if (messageBackgroundObjectUrl && messageBackgroundObjectUrl !== previewMessageBackgroundUrl) {
         URL.revokeObjectURL(messageBackgroundObjectUrl);
       }
       messageBackgroundObjectUrl = previewMessageBackgroundUrl;
       previewMessageBackgroundUrl = null;
-      pendingMessageBackgroundFile = null;
       hasStoredMessageBackground = true;
+      messageBackgroundSaving = false;
       saveMessageSettings({ backgroundMode: 'image' });
-      showToast(persistentStorageGranted
-        ? 'Votre fond personnel est enregistré durablement sur cet appareil.'
-        : 'Votre fond est enregistré localement, mais le navigateur ne garantit pas sa conservation.');
+      updateMessageBackgroundControls();
+      showToast(saveResult.persistentStorageGranted
+        ? window.I18n?.t('chat.backgroundSavedPersistent') || 'Votre fond personnel est enregistré durablement sur cet appareil.'
+        : window.I18n?.t('chat.backgroundSavedLocal') || 'Votre fond est enregistré localement, mais le navigateur ne garantit pas sa conservation.');
     } catch (error) {
+      if (selectionId !== messageBackgroundSelectionId) return;
       console.error('Échec de l’enregistrement du fond personnel.', error);
-      showToast('Impossible d’enregistrer cette image sur cet appareil.');
+      if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
+      previewMessageBackgroundUrl = null;
+      pendingMessageBackgroundFile = null;
+      messageBackgroundSaving = false;
+      applyMessageSettings();
+      updateMessageBackgroundControls();
+      showToast(window.I18n?.t('chat.backgroundSaveFailed') || 'Impossible d’enregistrer cette image sur cet appareil.');
     }
   });
-  cancelBackgroundButton?.addEventListener('click', () => {
-    if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
-    previewMessageBackgroundUrl = null;
-    pendingMessageBackgroundFile = null;
-    applyMessageSettings();
-  });
   removeBackgroundButton?.addEventListener('click', async () => {
+    messageBackgroundSelectionId += 1;
+    messageBackgroundSaving = false;
     try {
       await deleteMessageBackgroundImage();
       if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
@@ -1601,10 +1631,10 @@ function initMessageSettingsPanel() {
       pendingMessageBackgroundFile = null;
       hasStoredMessageBackground = false;
       saveMessageSettings({ backgroundMode: 'preset' });
-      showToast('Votre image de fond a été supprimée.');
+      showToast(window.I18n?.t('chat.backgroundDeleted') || 'Votre image de fond a été supprimée.');
     } catch (error) {
       console.error('Échec de la suppression du fond personnel.', error);
-      showToast('Impossible de supprimer cette image.');
+      showToast(window.I18n?.t('chat.backgroundDeleteFailed') || 'Impossible de supprimer cette image.');
     }
   });
   loadStoredMessageBackgroundState();
@@ -1625,7 +1655,7 @@ function initMessageSettingsPanel() {
   document.getElementById('restoreMessageAppearance')?.addEventListener('click', () => {
     saveSettings({ theme: DEFAULT_SETTINGS.theme });
     saveMessageSettings({ ...MESSAGE_SETTINGS_DEFAULTS, theme: DEFAULT_SETTINGS.theme });
-    showToast('Apparence de la conversation restaurée.');
+    showToast(window.I18n?.t('chat.appearanceRestored') || 'Apparence de la conversation restaurée.');
   });
 
   search?.addEventListener('input', () => {
@@ -2581,7 +2611,7 @@ async function initMessages() {
   const pairingJoinSection = document.getElementById('pairingJoinSection');
 
   document.getElementById('messagesBackBtn')?.addEventListener('click', () => {
-    document.querySelector('.nav-link[data-section="accueil"]')?.click();
+    navigateBackInApp();
   });
 
   if (btn) {
@@ -3230,32 +3260,190 @@ function createPlaceholderSVG(emoji) {
 
 /* ===== Navigation ===== */
 
+const APP_BACK_SENTINEL_KEY = '__notreCarnetBackSentinel';
+const APP_SECTION_HISTORY_LIMIT = 8;
+let appSectionHistory = [];
+let appBackSentinelActive = false;
+let appIgnoreNextPopState = false;
+let appBackSurfaceObserver = null;
+
+function getAppCurrentSection() {
+  return document.querySelector('.section.active')?.id || 'accueil';
+}
+
+function getOpenBackSurface() {
+  const dialog = document.querySelector('dialog[open]');
+  if (dialog) return { type: 'dialog', element: dialog };
+
+  const overlays = Array.from(document.querySelectorAll(
+    '.lightbox:not([hidden]), .modal-overlay:not([hidden]):not(#onboardingModal)'
+  ));
+  if (overlays.length) {
+    overlays.sort((left, right) => {
+      const leftZ = Number.parseInt(getComputedStyle(left).zIndex, 10) || 0;
+      const rightZ = Number.parseInt(getComputedStyle(right).zIndex, 10) || 0;
+      return leftZ - rightZ;
+    });
+    return { type: 'overlay', element: overlays[overlays.length - 1] };
+  }
+
+  const openDetails = Array.from(document.querySelectorAll('details[open]'));
+  if (openDetails.length) return { type: 'details', element: openDetails[openDetails.length - 1] };
+
+  const navLinks = document.getElementById('navLinks');
+  if (navLinks?.classList.contains('open')) return { type: 'navigation', element: navLinks };
+
+  return null;
+}
+
+function closeTopmostBackSurface() {
+  const surface = getOpenBackSurface();
+  if (!surface) return false;
+
+  if (surface.type === 'dialog') {
+    if (surface.element.id === 'messageAvatarPreviewDialog') {
+      document.getElementById('cancelMessageAvatarPreview')?.click();
+    } else {
+      surface.element.close();
+    }
+  } else if (surface.type === 'overlay') {
+    if (surface.element.id === 'lightbox') {
+      closeLightbox();
+    } else {
+      surface.element.hidden = true;
+    }
+  } else if (surface.type === 'details') {
+    surface.element.open = false;
+  } else {
+    surface.element.classList.remove('open');
+    document.getElementById('navToggle')?.setAttribute('aria-expanded', 'false');
+  }
+
+  return true;
+}
+
+function setAppActiveSection(target) {
+  if (!document.getElementById(target)?.classList.contains('section')) return;
+
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.toggle('active', link.dataset.section === target);
+  });
+  document.querySelectorAll('.section').forEach(section => {
+    section.classList.toggle('active', section.id === target);
+  });
+  document.body.classList.toggle('messages-open', target === 'messages');
+
+  const navLinks = document.getElementById('navLinks');
+  navLinks?.classList.remove('open');
+  document.getElementById('navToggle')?.setAttribute('aria-expanded', 'false');
+}
+
+function ensureAppBackSentinel() {
+  if (appBackSentinelActive || !window.history?.pushState) return;
+  const state = history.state && typeof history.state === 'object' ? { ...history.state } : {};
+  state[APP_BACK_SENTINEL_KEY] = true;
+  history.pushState(state, '', location.href);
+  appBackSentinelActive = true;
+}
+
+function releaseAppBackSentinel() {
+  if (!appBackSentinelActive) return;
+  appBackSentinelActive = false;
+  appIgnoreNextPopState = true;
+  history.back();
+}
+
+function syncAppBackSentinel() {
+  if (getAppCurrentSection() !== 'accueil' || getOpenBackSurface()) {
+    ensureAppBackSentinel();
+  } else {
+    releaseAppBackSentinel();
+  }
+}
+
+function navigateBackInApp() {
+  if (closeTopmostBackSurface()) {
+    syncAppBackSentinel();
+    return;
+  }
+  if (appBackSentinelActive) {
+    history.back();
+    return;
+  }
+  if (appSectionHistory.length > 1) {
+    appSectionHistory.pop();
+    setAppActiveSection(appSectionHistory[appSectionHistory.length - 1]);
+    syncAppBackSentinel();
+  }
+}
+
+function recordAppSection(target) {
+  const current = appSectionHistory[appSectionHistory.length - 1] || 'accueil';
+  if (target === current) return;
+  if (target === 'accueil') {
+    appSectionHistory = ['accueil'];
+    return;
+  }
+
+  appSectionHistory.push(target);
+  if (appSectionHistory.length > APP_SECTION_HISTORY_LIMIT) {
+    appSectionHistory = ['accueil', ...appSectionHistory.slice(-(APP_SECTION_HISTORY_LIMIT - 1))];
+  }
+}
+
 function initNavigation() {
   const links = document.querySelectorAll('.nav-link');
-  const sections = document.querySelectorAll('.section');
   const navLinks = document.getElementById('navLinks');
   const navToggle = document.getElementById('navToggle');
+  appSectionHistory = [getAppCurrentSection()];
+  appBackSentinelActive = !!history.state?.[APP_BACK_SENTINEL_KEY];
+
+  window.addEventListener('popstate', event => {
+    if (appIgnoreNextPopState) {
+      appIgnoreNextPopState = false;
+      return;
+    }
+    if (!appBackSentinelActive && !event.state?.[APP_BACK_SENTINEL_KEY]) return;
+
+    appBackSentinelActive = false;
+    if (!closeTopmostBackSurface() && appSectionHistory.length > 1) {
+      appSectionHistory.pop();
+      setAppActiveSection(appSectionHistory[appSectionHistory.length - 1]);
+    }
+    syncAppBackSentinel();
+  });
+
+  if (!appBackSurfaceObserver && document.body) {
+    appBackSurfaceObserver = new MutationObserver(syncAppBackSentinel);
+    appBackSurfaceObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class', 'hidden', 'open'],
+      subtree: true
+    });
+  }
+
+  syncAppBackSentinel();
 
   links.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const target = link.dataset.section;
-
-      links.forEach(l => l.classList.remove('active'));
-      link.classList.add('active');
-
-      sections.forEach(s => s.classList.remove('active'));
-      document.getElementById(target).classList.add('active');
-      document.body.classList.toggle('messages-open', target === 'messages');
-
-      navLinks.classList.remove('open');
-      navToggle.setAttribute('aria-expanded', 'false');
+      recordAppSection(target);
+      setAppActiveSection(target);
+      syncAppBackSentinel();
     });
   });
 
-  navToggle.addEventListener('click', () => {
+  navToggle?.addEventListener('click', () => {
     const isOpen = navLinks.classList.toggle('open');
     navToggle.setAttribute('aria-expanded', isOpen);
+  });
+
+  document.addEventListener('pointerdown', event => {
+    if (!navLinks?.classList.contains('open')) return;
+    if (navLinks.contains(event.target) || navToggle?.contains(event.target)) return;
+    navLinks.classList.remove('open');
+    navToggle?.setAttribute('aria-expanded', 'false');
   });
 }
 
@@ -3295,11 +3483,11 @@ function applyTheme(themeMode, persist = true, notify = false) {
 
   if (notify) {
     const messages = {
-      dark: 'Mode sombre activé 🌙',
-      light: 'Mode clair activé ☀️',
-      auto: 'Mode automatique activé 🌗'
+      dark: window.I18n?.t('theme.darkActivated') || 'Mode sombre activé 🌙',
+      light: window.I18n?.t('theme.lightActivated') || 'Mode clair activé ☀️',
+      auto: window.I18n?.t('theme.autoActivated') || 'Mode automatique activé 🌗'
     };
-    showToast(messages[safeMode] || 'Thème mis à jour');
+    showToast(messages[safeMode] || window.I18n?.t('theme.updated') || 'Thème mis à jour');
   }
 }
 
@@ -3321,12 +3509,12 @@ function updateThemeToggleButton(themeMode) {
   if (!button) return;
 
   const labels = {
-    dark: 'Changer vers le mode clair',
-    light: 'Changer vers le mode automatique',
-    auto: 'Changer vers le mode sombre'
+    dark: window.I18n?.t('theme.changeToLight') || 'Changer vers le mode clair',
+    light: window.I18n?.t('theme.changeToAuto') || 'Changer vers le mode automatique',
+    auto: window.I18n?.t('theme.changeToDark') || 'Changer vers le mode sombre'
   };
 
-  button.setAttribute('aria-label', labels[themeMode] || 'Changer le thème');
+  button.setAttribute('aria-label', labels[themeMode] || window.I18n?.t('theme.change') || 'Changer le thème');
   const lightIcon = button.querySelector('.theme-icon-light');
   const darkIcon = button.querySelector('.theme-icon-dark');
 
@@ -4177,7 +4365,16 @@ function formatDate(dateStr) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await window.I18n?.init();
-  window.addEventListener('carnet:languagechange', () => updateCounter(getSettings().startDate));
+  window.addEventListener('carnet:languagechange', () => {
+    updateCounter(getSettings().startDate);
+    updateMessageHeader();
+    updateMessagesPairingUI();
+    const themeMode = getThemeModePreference();
+    updateThemeControls(themeMode);
+    updateThemeToggleButton(themeMode);
+    updateMessageBackgroundControls();
+    updateMessageSettingsSummary();
+  });
   initTheme();
   initSettings();
   initEditableFields();
