@@ -844,6 +844,16 @@ const MESSAGE_BACKGROUND_LEGACY_ID = 'conversation-background';
 const MESSAGE_SETTINGS_MIGRATED_KEY = 'carnet_message_settings_migrated';
 
 let currentLightboxId = null;
+let lightboxZoom = 1;
+let lightboxRotation = 0;
+let lightboxSlideshowTimer = null;
+let lightboxSlideshowPaused = false;
+let lightboxCloseTimer = null;
+let galleryLongPressTimer = null;
+let galleryLongPressStart = null;
+let suppressGalleryClickUntil = 0;
+let galleryContextPhotoId = null;
+let lightboxReturnFocus = null;
 let deferredPrompt = null;
 let settingsPhotoDataUrl1 = null;
 let settingsPhotoDataUrl2 = null;
@@ -881,7 +891,10 @@ const MEDIA_SETTINGS_DEFAULTS = {
   playerStyle: 'signature',
   recordAnimation: true,
   visualizer: true,
-  playlistOrder: 'added'
+  playlistOrder: 'added',
+  slideshowEnabled: false,
+  slideshowInterval: '3',
+  customSlideshowSeconds: 5
 };
 
 /* ===== Storage Helpers ===== */
@@ -3327,6 +3340,14 @@ function getAppCurrentSection() {
   return document.querySelector('.section.active')?.id || 'accueil';
 }
 
+function updateNavMenuForActiveSection() {
+  const activeSection = getAppCurrentSection();
+  document.querySelectorAll('#navLinks a.nav-link[data-section]').forEach(link => {
+    const item = link.closest('li');
+    if (item) item.hidden = link.dataset.section === activeSection;
+  });
+}
+
 function getOpenBackSurface() {
   const dialog = document.querySelector('dialog[open]');
   if (dialog) return { type: 'dialog', element: dialog };
@@ -3387,6 +3408,7 @@ function setAppActiveSection(target) {
   document.querySelectorAll('.section').forEach(section => {
     section.classList.toggle('active', section.id === target);
   });
+  updateNavMenuForActiveSection();
   document.body.classList.toggle('messages-open', target === 'messages');
 
   const navLinks = document.getElementById('navLinks');
@@ -3403,6 +3425,16 @@ function initMediaPageNavigation() {
     tabs.map(tab => [tab.dataset.mediaPage, document.getElementById(tab.getAttribute('aria-controls'))])
   );
   if (!viewport || !track || tabs.length !== 2 || Object.values(pages).some(page => !page)) return;
+
+  const mediaNavigation = document.querySelector('#multimedia .media-navigation');
+  const navigationSentinel = document.querySelector('#multimedia .media-navigation-sentinel');
+  if ('IntersectionObserver' in window && mediaNavigation && navigationSentinel) {
+    const stickyTop = getComputedStyle(mediaNavigation).top;
+    const stickyObserver = new IntersectionObserver(([entry]) => {
+      mediaNavigation.classList.toggle('is-stuck', !entry.isIntersecting);
+    }, { rootMargin: `-${stickyTop} 0px 0px 0px` });
+    stickyObserver.observe(navigationSentinel);
+  }
 
   let activePage = 'photos';
   let pointerStart = null;
@@ -3550,6 +3582,7 @@ function initNavigation() {
   const navToggle = document.getElementById('navToggle');
   appSectionHistory = [getAppCurrentSection()];
   appBackSentinelActive = !!history.state?.[APP_BACK_SENTINEL_KEY];
+  updateNavMenuForActiveSection();
 
   window.addEventListener('popstate', event => {
     if (appIgnoreNextPopState) {
@@ -3909,51 +3942,64 @@ function renderGallery() {
 
   empty.hidden = true;
 
-  photos.forEach(photo => grid.appendChild(createGalleryItem(photo, true)));
+  photos.forEach(photo => grid.appendChild(createGalleryItem(photo)));
 }
 
-function createGalleryItem(photo, showDelete = false) {
+function createGalleryItem(photo) {
   const item = document.createElement('article');
   item.className = 'gallery-item';
   item.dataset.id = photo.id;
+  item.tabIndex = 0;
+  item.setAttribute('role', 'button');
+  item.setAttribute('aria-label', galleryText('openImage'));
 
   const image = document.createElement('img');
   image.src = photo.src;
-  image.alt = 'Photo souvenir';
+  image.alt = galleryText('openImage');
   image.loading = 'lazy';
   item.appendChild(image);
 
-  const favoriteBtn = document.createElement('button');
-  favoriteBtn.className = `gallery-favorite-btn${photo.favorite ? ' is-favorite' : ''}`;
-  favoriteBtn.type = 'button';
-  favoriteBtn.textContent = photo.favorite ? '♥' : '♡';
-  favoriteBtn.setAttribute('aria-label', photo.favorite ? 'Retirer des souvenirs spéciaux' : 'Ajouter aux souvenirs spéciaux');
-  favoriteBtn.setAttribute('aria-pressed', photo.favorite ? 'true' : 'false');
-  favoriteBtn.addEventListener('click', (event) => {
-    event.stopPropagation();
-    togglePhotoFavorite(photo.id);
+  const openPhoto = () => {
+    if (Date.now() < suppressGalleryClickUntil) return;
+    openLightbox(photo.id);
+  };
+  item.addEventListener('click', openPhoto);
+  item.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openPhoto();
   });
-  item.appendChild(favoriteBtn);
-
-  if (showDelete) {
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'gallery-delete-btn';
-    deleteBtn.type = 'button';
-    deleteBtn.setAttribute('aria-label', 'Supprimer la photo');
-    deleteBtn.textContent = '🗑️';
-    deleteBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      if (!confirm('Voulez-vous vraiment supprimer cette photo ?')) return;
-      item.classList.add('is-removing');
-      setTimeout(() => {
-        if (item.isConnected) deletePhoto(photo.id);
-      }, 180);
+  item.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    openGalleryActionMenu(photo.id, { x: event.clientX, y: event.clientY });
+  });
+  item.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || !['touch', 'pen'].includes(event.pointerType)) return;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    galleryLongPressStart = { x: startX, y: startY };
+    clearTimeout(galleryLongPressTimer);
+    galleryLongPressTimer = setTimeout(() => {
+      suppressGalleryClickUntil = Date.now() + 700;
+      openGalleryActionMenu(photo.id, { x: startX, y: startY });
+    }, 560);
+  });
+  item.addEventListener('pointermove', event => {
+    if (galleryLongPressStart && (Math.abs(event.clientX - galleryLongPressStart.x) > 10 || Math.abs(event.clientY - galleryLongPressStart.y) > 10)) {
+      clearTimeout(galleryLongPressTimer);
+    }
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(type => {
+    item.addEventListener(type, () => {
+      clearTimeout(galleryLongPressTimer);
+      galleryLongPressStart = null;
     });
-    item.appendChild(deleteBtn);
-  }
-
-  item.addEventListener('click', () => openLightbox(photo.id));
+  });
   return item;
+}
+
+function galleryText(key) {
+  return window.I18n?.t(`gallery.${key}`) || key;
 }
 
 function renderFavoriteGallery(photos = getGallery()) {
@@ -3963,7 +4009,7 @@ function renderFavoriteGallery(photos = getGallery()) {
   const count = document.getElementById('favoritePhotoCount');
 
   grid.innerHTML = '';
-  count.textContent = `${favorites.length} favori${favorites.length === 1 ? '' : 's'}`;
+  count.textContent = galleryText('favoriteCount').replace('{count}', window.I18n?.formatNumber(favorites.length) ?? String(favorites.length));
   empty.hidden = favorites.length > 0;
   favorites.forEach(photo => grid.appendChild(createGalleryItem(photo)));
 }
@@ -3984,9 +4030,23 @@ function openLightbox(id) {
   const photo = photos.find(p => p.id === id);
   if (!photo) return;
 
+  clearTimeout(lightboxCloseTimer);
+  stopGallerySlideshow();
   currentLightboxId = id;
+  lightboxReturnFocus = document.activeElement;
+  lightboxZoom = 1;
+  lightboxRotation = 0;
+  lightboxSlideshowPaused = false;
+  document.getElementById('lightbox').classList.remove('is-closing');
   renderLightboxPhoto();
-  document.getElementById('lightbox').hidden = false;
+  const lightbox = document.getElementById('lightbox');
+  lightbox.hidden = false;
+  lightbox.classList.remove('is-opening');
+  void lightbox.offsetWidth;
+  lightbox.classList.add('is-opening');
+  updateGallerySlideshowButton();
+  startGallerySlideshow();
+  document.getElementById('lightboxClose').focus();
 }
 
 function renderLightboxPhoto() {
@@ -3998,14 +4058,15 @@ function renderLightboxPhoto() {
   const image = document.getElementById('lightboxImg');
   image.classList.remove('media-photo-transition');
   image.src = photo.src;
+  image.alt = photo.name || galleryText('openImage');
+  updateLightboxTransform();
   if (getMediaPreferences().photoEffect !== 'none') {
     void image.offsetWidth;
     image.classList.add('media-photo-transition');
   }
   document.getElementById('lightboxCounter').textContent = `${index + 1} / ${photos.length}`;
-  const favoriteBtn = document.getElementById('lightboxFavorite');
-  favoriteBtn.textContent = photo.favorite ? '♥ Dans vos favoris' : '♡ Ajouter aux favoris';
-  favoriteBtn.setAttribute('aria-pressed', photo.favorite ? 'true' : 'false');
+  updateGalleryActionLabels(photo);
+  updateGallerySlideshowButton();
 }
 
 function navigateLightbox(direction) {
@@ -4014,20 +4075,214 @@ function navigateLightbox(direction) {
   if (index < 0 || photos.length < 2) return;
   const nextIndex = (index + direction + photos.length) % photos.length;
   currentLightboxId = photos[nextIndex].id;
+  lightboxZoom = 1;
+  lightboxRotation = 0;
   renderLightboxPhoto();
+  startGallerySlideshow();
 }
 
 function closeLightbox() {
-  document.getElementById('lightbox').hidden = true;
+  const lightbox = document.getElementById('lightbox');
+  if (lightbox.hidden) return;
+  stopGallerySlideshow();
+  closeGalleryActionMenu();
+  document.getElementById('galleryInfoDialog').close();
+  lightbox.classList.remove('is-opening');
+  lightbox.classList.add('is-closing');
   currentLightboxId = null;
+  lightboxZoom = 1;
+  lightboxRotation = 0;
+  lightboxCloseTimer = setTimeout(() => {
+    lightbox.hidden = true;
+    lightbox.classList.remove('is-closing');
+    lightboxReturnFocus?.focus?.();
+    lightboxReturnFocus = null;
+  }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 220);
+  document.getElementById('galleryViewerMenuTrigger').setAttribute('aria-expanded', 'false');
 }
 
 function deletePhoto(id) {
+  const originalIndex = getGallery().findIndex(photo => photo.id === id);
   const photos = getGallery().filter(p => p.id !== id);
   saveGallery(photos);
   renderGallery();
-  if (currentLightboxId === id) closeLightbox();
-  showToast('✅ Photo supprimée avec succès.');
+  if (currentLightboxId === id) {
+    if (photos.length) {
+      currentLightboxId = photos[Math.min(Math.max(originalIndex, 0), photos.length - 1)].id;
+      renderLightboxPhoto();
+      startGallerySlideshow();
+    } else {
+      closeLightbox();
+    }
+  }
+  showToast(`✅ ${galleryText('deleted')}`);
+}
+
+function openGalleryActionMenu(photoId, position, inViewer = false) {
+  const photo = getGallery().find(item => item.id === photoId);
+  const menu = document.getElementById('galleryActionMenu');
+  if (!photo || !menu) return;
+  galleryContextPhotoId = photoId;
+  menu.querySelectorAll('[data-gallery-action^="zoom"], [data-gallery-action="rotate"], [data-gallery-action="reset"]')
+    .forEach(button => { button.hidden = !inViewer; });
+  updateGalleryActionLabels(photo);
+  menu.hidden = false;
+
+  const trigger = document.getElementById('galleryViewerMenuTrigger');
+  if (inViewer) {
+    trigger.setAttribute('aria-expanded', 'true');
+    const bounds = trigger.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, bounds.right - menu.offsetWidth)}px`;
+    menu.style.top = `${bounds.bottom + 8}px`;
+  } else {
+    menu.style.left = `${position.x}px`;
+    menu.style.top = `${position.y}px`;
+  }
+  const bounds = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(bounds.left, innerWidth - bounds.width - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(bounds.top, innerHeight - bounds.height - 8))}px`;
+  menu.querySelector('[role="menuitem"]:not([hidden])')?.focus();
+}
+
+function updateGalleryActionLabels(photo = getGallery().find(item => item.id === galleryContextPhotoId)) {
+  if (!photo) return;
+  const favoriteAction = document.querySelector('[data-gallery-action="favorite"]');
+  if (favoriteAction) favoriteAction.textContent = galleryText(photo.favorite ? 'removeFavorite' : 'addFavorite');
+}
+
+function closeGalleryActionMenu(returnFocus = false) {
+  const menu = document.getElementById('galleryActionMenu');
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  document.getElementById('galleryViewerMenuTrigger').setAttribute('aria-expanded', 'false');
+  if (returnFocus) {
+    if (!document.getElementById('lightbox').hidden) document.getElementById('galleryViewerMenuTrigger').focus();
+    else Array.from(document.querySelectorAll('.gallery-item')).find(item => item.dataset.id === galleryContextPhotoId)?.focus();
+  }
+}
+
+function updateLightboxTransform() {
+  const image = document.getElementById('lightboxImg');
+  image.style.transform = `scale(${lightboxZoom}) rotate(${lightboxRotation}deg)`;
+  image.classList.toggle('is-zoomed', lightboxZoom !== 1);
+}
+
+function gallerySlideshowDelay() {
+  const preferences = getMediaPreferences();
+  const selected = preferences.slideshowInterval === 'custom'
+    ? preferences.customSlideshowSeconds
+    : Number(preferences.slideshowInterval);
+  return Math.max(1, Math.min(3600, Number(selected) || 3)) * 1000;
+}
+
+function stopGallerySlideshow(resetPause = true) {
+  clearTimeout(lightboxSlideshowTimer);
+  lightboxSlideshowTimer = null;
+  if (resetPause) lightboxSlideshowPaused = false;
+}
+
+function startGallerySlideshow() {
+  stopGallerySlideshow(false);
+  const photos = getGallery();
+  if (!currentLightboxId || !getMediaPreferences().slideshowEnabled || lightboxSlideshowPaused || photos.length < 2) return;
+  lightboxSlideshowTimer = setTimeout(() => navigateLightbox(1), gallerySlideshowDelay());
+}
+
+function updateGallerySlideshowButton() {
+  const button = document.getElementById('gallerySlideshowToggle');
+  if (!button) return;
+  const enabled = getMediaPreferences().slideshowEnabled;
+  button.hidden = !enabled || !currentLightboxId;
+  const action = lightboxSlideshowPaused ? 'resume' : 'pause';
+  const icon = lightboxSlideshowPaused ? '▶' : 'Ⅱ';
+  button.innerHTML = `${icon} <span>${galleryText(action)}</span>`;
+  button.setAttribute('aria-label', galleryText(action));
+}
+
+function showGalleryInfo(photoId) {
+  const photo = getGallery().find(item => item.id === photoId);
+  if (!photo) return;
+  const dialog = document.getElementById('galleryInfoDialog');
+  const details = document.getElementById('galleryInfoDetails');
+  details.replaceChildren();
+  const rawSize = photo.src?.split(',')[1] || '';
+  const approxBytes = photo.src?.includes(';base64,')
+    ? Math.max(0, Math.floor(rawSize.length * 3 / 4) - (rawSize.endsWith('==') ? 2 : rawSize.endsWith('=') ? 1 : 0))
+    : new TextEncoder().encode(rawSize).length;
+  const date = photo.added ? new Date(photo.added) : null;
+  const rows = [
+    ['imageName', photo.name || `${galleryText('openImage')} ${photo.id}`],
+    ['imageDate', date && !Number.isNaN(date.valueOf()) ? new Intl.DateTimeFormat(window.I18n?.getLocale() || undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date) : galleryText('no')],
+    ['imageSize', approxBytes ? `${(approxBytes / 1024).toFixed(1)} KB` : galleryText('no')],
+    ['imageFavorite', galleryText(photo.favorite ? 'yes' : 'no')]
+  ];
+  rows.forEach(([key, value]) => {
+    const term = document.createElement('dt');
+    term.textContent = galleryText(key);
+    const description = document.createElement('dd');
+    description.textContent = value;
+    details.append(term, description);
+  });
+  dialog.showModal();
+}
+
+async function shareGalleryPhoto(photoId) {
+  const photo = getGallery().find(item => item.id === photoId);
+  if (!photo) return;
+  try {
+    const dataUrl = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(photo.src || '');
+    if (!dataUrl) throw new Error('Le format de cette image ne peut pas être partagé.');
+    const mimeType = dataUrl[1] || 'image/png';
+    const imageBytes = dataUrl[2]
+      ? Uint8Array.from(atob(dataUrl[3]), character => character.charCodeAt(0))
+      : new TextEncoder().encode(decodeURIComponent(dataUrl[3]));
+    const blob = new Blob([imageBytes], { type: mimeType });
+    const extension = ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg', 'image/avif': 'avif' })[mimeType] || 'img';
+    const file = new File([blob], `${photo.name || `souvenir-${photo.id}`}.${extension}`, { type: blob.type || 'image/png' });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: galleryText('shareTitle') });
+      showToast(galleryText('shareSuccess'));
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = file.name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    showToast(galleryText('shareUnsupported'));
+  } catch (error) {
+    if (error.name === 'AbortError') return;
+    console.error('Erreur lors du partage de l’image :', error);
+    showToast(galleryText('shareError'));
+  }
+}
+
+function performGalleryAction(action) {
+  const photoId = galleryContextPhotoId || currentLightboxId;
+  if (!photoId) return;
+  closeGalleryActionMenu();
+  if (action === 'favorite') {
+    togglePhotoFavorite(photoId);
+  } else if (action === 'delete') {
+    if (confirm(galleryText('confirmDelete'))) deletePhoto(photoId);
+  } else if (action === 'share') {
+    shareGalleryPhoto(photoId);
+  } else if (action === 'info') {
+    showGalleryInfo(photoId);
+  } else if (action === 'zoomIn') {
+    lightboxZoom = Math.min(3, lightboxZoom + 0.25);
+    updateLightboxTransform();
+  } else if (action === 'zoomOut') {
+    lightboxZoom = Math.max(1, lightboxZoom - 0.25);
+    updateLightboxTransform();
+  } else if (action === 'rotate') {
+    lightboxRotation = (lightboxRotation + 90) % 360;
+    updateLightboxTransform();
+  } else if (action === 'reset') {
+    lightboxZoom = 1;
+    lightboxRotation = 0;
+    updateLightboxTransform();
+  }
 }
 
 function initGallery() {
@@ -4058,16 +4313,42 @@ function initGallery() {
   });
 
   document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
-  document.getElementById('lightboxDelete').addEventListener('click', () => {
-    if (currentLightboxId && confirm('Voulez-vous vraiment supprimer cette photo ?')) {
-      deletePhoto(currentLightboxId);
+  document.getElementById('galleryViewerMenuTrigger').addEventListener('click', event => {
+    if (document.getElementById('galleryActionMenu').hidden) {
+      openGalleryActionMenu(currentLightboxId, null, true);
+    } else {
+      closeGalleryActionMenu();
     }
+    event.stopPropagation();
   });
-
+  document.getElementById('gallerySlideshowToggle').addEventListener('click', () => {
+    lightboxSlideshowPaused = !lightboxSlideshowPaused;
+    updateGallerySlideshowButton();
+    startGallerySlideshow();
+  });
   document.getElementById('lightboxPrev').addEventListener('click', () => navigateLightbox(-1));
   document.getElementById('lightboxNext').addEventListener('click', () => navigateLightbox(1));
-  document.getElementById('lightboxFavorite').addEventListener('click', () => {
-    if (currentLightboxId) togglePhotoFavorite(currentLightboxId);
+  document.getElementById('galleryActionMenu').addEventListener('click', event => {
+    const action = event.target.closest('[data-gallery-action]')?.dataset.galleryAction;
+    if (action) performGalleryAction(action);
+  });
+  document.getElementById('galleryInfoClose').addEventListener('click', () => {
+    document.getElementById('galleryInfoDialog').close();
+  });
+  const galleryInfoDialog = document.getElementById('galleryInfoDialog');
+  galleryInfoDialog.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    galleryInfoDialog.close();
+  });
+  galleryInfoDialog.addEventListener('click', event => {
+    if (event.target === event.currentTarget) event.currentTarget.close();
+  });
+  document.addEventListener('pointerdown', event => {
+    const menu = document.getElementById('galleryActionMenu');
+    const trigger = document.getElementById('galleryViewerMenuTrigger');
+    if (!menu.hidden && !menu.contains(event.target) && event.target !== trigger) closeGalleryActionMenu();
   });
 
   document.getElementById('lightbox').addEventListener('click', (e) => {
@@ -4075,10 +4356,34 @@ function initGallery() {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (document.getElementById('lightbox').hidden) return;
+    if (event.key === 'Escape' && !document.getElementById('galleryActionMenu').hidden) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeGalleryActionMenu(true);
+      return;
+    }
+    if (document.getElementById('lightbox').hidden || document.getElementById('galleryInfoDialog').open) return;
     if (event.key === 'Escape') closeLightbox();
     if (event.key === 'ArrowLeft') navigateLightbox(-1);
     if (event.key === 'ArrowRight') navigateLightbox(1);
+  });
+
+  document.getElementById('galleryActionMenu').addEventListener('keydown', event => {
+    const items = Array.from(event.currentTarget.querySelectorAll('[role="menuitem"]:not([hidden])'));
+    const index = items.indexOf(document.activeElement);
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0
+      : event.key === 'End' ? items.length - 1
+        : (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    items[next]?.focus();
+  });
+
+  window.addEventListener('carnet:languagechange', () => {
+    renderGallery();
+    if (currentLightboxId) renderLightboxPhoto();
+    updateGalleryActionLabels();
+    updateGallerySlideshowButton();
   });
 
   renderGallery();
@@ -4095,7 +4400,7 @@ function getMediaPreferences() {
     ...MEDIA_SETTINGS_DEFAULTS,
     ...(stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {})
   };
-  const booleanPreferences = ['animations', 'glass', 'showFavorites', 'autoNext', 'shuffle', 'recordAnimation', 'visualizer'];
+  const booleanPreferences = ['animations', 'glass', 'showFavorites', 'autoNext', 'shuffle', 'recordAnimation', 'visualizer', 'slideshowEnabled'];
   const validOptions = {
     density: ['comfortable', 'compact'],
     photoLayout: ['grid', 'mosaic'],
@@ -4103,7 +4408,8 @@ function getMediaPreferences() {
     photoEffect: ['zoom', 'fade', 'none'],
     repeat: ['off', 'one', 'all'],
     playerStyle: ['signature', 'compact'],
-    playlistOrder: ['added', 'title', 'recent']
+    playlistOrder: ['added', 'title', 'recent'],
+    slideshowInterval: ['3', '5', '10', 'custom']
   };
 
   booleanPreferences.forEach(name => {
@@ -4112,6 +4418,10 @@ function getMediaPreferences() {
   Object.entries(validOptions).forEach(([name, options]) => {
     if (!options.includes(preferences[name])) preferences[name] = MEDIA_SETTINGS_DEFAULTS[name];
   });
+  const customSeconds = Number(preferences.customSlideshowSeconds);
+  preferences.customSlideshowSeconds = Number.isFinite(customSeconds)
+    ? Math.max(1, Math.min(3600, Math.round(customSeconds)))
+    : MEDIA_SETTINGS_DEFAULTS.customSlideshowSeconds;
   return preferences;
 }
 
@@ -4132,12 +4442,16 @@ function applyMediaPreferences(preferences = getMediaPreferences()) {
   document.documentElement.dataset.mediaAnimations = String(preferences.animations);
   document.documentElement.dataset.mediaGlass = String(preferences.glass);
   updateVinylRotation(Boolean(playlistTracks[currentTrackIndex] && currentAudio && !currentAudio.paused));
+  const customIntervalRow = document.getElementById('galleryCustomIntervalRow');
+  if (customIntervalRow) customIntervalRow.hidden = preferences.slideshowInterval !== 'custom';
 
   document.querySelectorAll('[data-media-setting]').forEach(control => {
     const value = preferences[control.dataset.mediaSetting];
     if (control.type === 'checkbox') control.checked = value;
     else control.value = value;
   });
+  updateGallerySlideshowButton();
+  startGallerySlideshow();
 }
 
 function initMediaSettings() {
@@ -4197,7 +4511,11 @@ function initMediaSettings() {
   dialog.querySelectorAll('[data-media-setting]').forEach(control => {
     control.addEventListener('change', () => {
       const name = control.dataset.mediaSetting;
-      const value = control.type === 'checkbox' ? control.checked : control.value;
+      const value = control.type === 'checkbox'
+        ? control.checked
+        : control.type === 'number'
+          ? Math.max(1, Math.min(3600, Math.round(Number(control.value) || MEDIA_SETTINGS_DEFAULTS[name])))
+          : control.value;
       const preferences = { ...getMediaPreferences(), [name]: value };
       save(getMediaPreferencesStorageKey(), preferences);
       applyMediaPreferences(preferences);

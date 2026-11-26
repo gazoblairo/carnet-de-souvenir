@@ -1,10 +1,10 @@
-const CACHE_NAME = 'carnet-v48';
+const CACHE_NAME = 'carnet-v55';
 const ASSETS = [
   '/',
   '/index.html',
-  '/css/style.css?v=20261126d',
-  '/js/i18n.js?v=20261126b',
-  '/js/script.js?v=20261126c',
+  '/css/style.css?v=20261126h',
+  '/js/i18n.js?v=20261126e',
+  '/js/script.js?v=20261126i',
   '/supabase.js',
   '/js/realtime.js',
   '/js/messages.js',

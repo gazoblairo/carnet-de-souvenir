@@ -12,7 +12,7 @@
   <script src="supabase.js"></script>
   <script src="js/realtime.js"></script>
   <script src="js/messages.js"></script>
-  <script src="js/i18n.js?v=20261126b"></script>
+  <script src="js/i18n.js?v=20261126e"></script>
   <script>
     try {
       const rawSettings = localStorage.getItem('carnet_settings');
@@ -31,7 +31,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
   <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=20261126d">
+  <link rel="stylesheet" href="css/style.css?v=20261126h">
 </head>
 <body>
   <div id="app">
@@ -466,9 +466,10 @@
       </section>
 
       <section id="multimedia" class="section">
+        <div class="media-navigation-sentinel" aria-hidden="true"></div>
         <div class="media-navigation">
           <nav class="media-page-tabs" role="tablist" aria-label="Pages des médias" data-i18n-attr="aria-label" data-i18n-aria-label="media.pages">
-            <button class="media-page-tab is-active" id="mediaPhotosTab" type="button" role="tab" aria-selected="true" aria-controls="mediaPhotosPage" tabindex="0" data-media-page="photos" data-i18n="media.photosTab">Photos</button>
+            <button class="media-page-tab is-active" id="mediaPhotosTab" type="button" role="tab" aria-selected="true" aria-controls="mediaPhotosPage" tabindex="0" data-media-page="photos" data-i18n="media.photosTab">Galerie</button>
             <button class="media-page-tab" id="mediaMusicTab" type="button" role="tab" aria-selected="false" aria-controls="mediaMusicPage" tabindex="-1" data-media-page="music" data-i18n="media.musicTab">Musiques</button>
           </nav>
           <button class="media-settings-trigger" id="mediaSettingsOpen" type="button" aria-label="Paramètres des médias" title="Paramètres des médias" data-i18n-attr="aria-label,title" data-i18n-aria-label="mediaSettings.open" data-i18n-title="mediaSettings.open">
@@ -481,13 +482,13 @@
               <div>
                 <span class="media-settings-kicker">NOTRE CARNET ❤️</span>
                 <h2 id="mediaSettingsTitle" data-i18n="mediaSettings.title">Préférences Médias</h2>
-                <p data-i18n="mediaSettings.subtitle">Personnalisez votre espace Photos et Musiques.</p>
+                <p data-i18n="mediaSettings.subtitle">Personnalisez votre galerie et votre espace musical.</p>
               </div>
               <button class="media-settings-close" id="mediaSettingsClose" type="button" aria-label="Fermer les paramètres" data-i18n-attr="aria-label" data-i18n-aria-label="mediaSettings.close">×</button>
             </header>
             <nav class="media-settings-tabs" role="tablist" aria-label="Catégories des paramètres" data-i18n-attr="aria-label" data-i18n-aria-label="mediaSettings.categories">
               <button class="media-settings-tab is-active" id="mediaSettingsGeneralTab" type="button" role="tab" aria-selected="true" aria-controls="mediaSettingsGeneral" data-media-settings-tab="general"><span aria-hidden="true">✨</span><span data-i18n="mediaSettings.general">Général</span></button>
-              <button class="media-settings-tab" id="mediaSettingsPhotosTab" type="button" role="tab" aria-selected="false" aria-controls="mediaSettingsPhotos" data-media-settings-tab="photos"><span aria-hidden="true">📸</span><span data-i18n="mediaSettings.photos">Photos</span></button>
+              <button class="media-settings-tab" id="mediaSettingsPhotosTab" type="button" role="tab" aria-selected="false" aria-controls="mediaSettingsPhotos" data-media-settings-tab="photos"><span aria-hidden="true">📸</span><span data-i18n="mediaSettings.photos">Galerie</span></button>
               <button class="media-settings-tab" id="mediaSettingsMusicTab" type="button" role="tab" aria-selected="false" aria-controls="mediaSettingsMusic" data-media-settings-tab="music"><span aria-hidden="true">🎵</span><span data-i18n="mediaSettings.music">Musiques</span></button>
             </nav>
             <div class="media-settings-content">
@@ -516,7 +517,7 @@
               </section>
               <section class="media-settings-panel" id="mediaSettingsPhotos" role="tabpanel" aria-labelledby="mediaSettingsPhotosTab" data-media-settings-panel="photos" hidden>
                 <div class="media-settings-panel-heading">
-                  <h3 data-i18n="mediaSettings.photos">Photos</h3>
+                  <h3 data-i18n="mediaSettings.photos">Galerie</h3>
                   <p data-i18n="mediaSettings.photosHint">Choisissez la présentation de vos souvenirs.</p>
                 </div>
                 <div class="media-preference-row">
@@ -547,6 +548,24 @@
                   <input id="mediaShowFavorites" type="checkbox" data-media-setting="showFavorites">
                   <span class="media-switch-track" aria-hidden="true"></span>
                 </label>
+                <label class="media-preference-row media-preference-switch" for="mediaSlideshowEnabled">
+                  <span class="media-preference-copy"><span data-i18n="gallery.autoScroll">Défilement automatique</span></span>
+                  <input id="mediaSlideshowEnabled" type="checkbox" data-media-setting="slideshowEnabled">
+                  <span class="media-switch-track" aria-hidden="true"></span>
+                </label>
+                <div class="media-preference-row">
+                  <label class="media-preference-copy" for="mediaSlideshowInterval" data-i18n="gallery.interval">Intervalle entre les images</label>
+                  <select id="mediaSlideshowInterval" data-media-setting="slideshowInterval">
+                    <option value="3" data-i18n="gallery.seconds3">3 secondes</option>
+                    <option value="5" data-i18n="gallery.seconds5">5 secondes</option>
+                    <option value="10" data-i18n="gallery.seconds10">10 secondes</option>
+                    <option value="custom" data-i18n="gallery.custom">Personnalisé</option>
+                  </select>
+                </div>
+                <div class="media-preference-row gallery-custom-interval-row" id="galleryCustomIntervalRow" hidden>
+                  <label class="media-preference-copy" for="mediaSlideshowCustomSeconds" data-i18n="gallery.customSeconds">Durée personnalisée (secondes)</label>
+                  <input id="mediaSlideshowCustomSeconds" type="number" min="1" max="3600" step="1" value="5" data-media-setting="customSlideshowSeconds">
+                </div>
               </section>
               <section class="media-settings-panel" id="mediaSettingsMusic" role="tabpanel" aria-labelledby="mediaSettingsMusicTab" data-media-settings-panel="music" hidden>
                 <div class="media-settings-panel-heading">
@@ -622,8 +641,8 @@
                   <div class="gallery-grid" id="galleryGrid"></div>
                   <div class="empty-state" id="galleryEmpty" hidden>
                     <span class="empty-icon">🖼️</span>
-                    <p>Aucune photo pour l'instant</p>
-                    <p class="empty-sub">Ajoutez vos plus beaux moments !</p>
+                    <p data-i18n="media.noPhotos">Aucune photo pour l'instant</p>
+                    <p class="empty-sub" data-i18n="gallery.emptyHint">Ajoutez vos plus beaux moments !</p>
                   </div>
                 </div>
 
@@ -631,16 +650,16 @@
                   <section class="content-panel" aria-labelledby="specialMemoriesTitle">
                     <div class="section-header">
                       <div>
-                        <h2 id="specialMemoriesTitle">Nos souvenirs spéciaux</h2>
-                        <p class="media-section-intro">Gardez tout près les moments qui vous ressemblent.</p>
+                        <h2 id="specialMemoriesTitle" data-i18n="gallery.favoritesTitle">Nos souvenirs spéciaux</h2>
+                        <p class="media-section-intro" data-i18n="gallery.favoritesHint">Gardez tout près les moments qui vous ressemblent.</p>
                       </div>
                       <span class="favorite-photo-count" id="favoritePhotoCount">0 favori</span>
                     </div>
                     <div class="gallery-grid special-gallery-grid" id="favoriteGalleryGrid"></div>
                     <div class="empty-state" id="favoriteGalleryEmpty">
                       <span class="empty-icon">♡</span>
-                      <p>Vos moments préférés auront leur place ici</p>
-                      <p class="empty-sub">Touchez le cœur d’une photo pour l’ajouter à vos souvenirs spéciaux.</p>
+                      <p data-i18n="gallery.emptyFavoritesTitle">Vos moments préférés auront leur place ici</p>
+                      <p class="empty-sub" data-i18n="gallery.emptyFavoritesHint">Ouvrez le menu d’une image pour l’ajouter à vos favoris.</p>
                     </div>
                   </section>
                 </div>
@@ -981,19 +1000,40 @@
     </div>
 
     <!-- Lightbox -->
-    <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Visionneuse de photos" hidden>
-      <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Fermer">&times;</button>
+    <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Visionneuse de la galerie" data-i18n-attr="aria-label" data-i18n-aria-label="gallery.viewer" hidden>
+      <header class="lightbox-header">
+        <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Fermer" data-i18n-attr="aria-label" data-i18n-aria-label="gallery.close">&times;</button>
+        <button class="gallery-viewer-menu-trigger" id="galleryViewerMenuTrigger" type="button" aria-label="Autres actions" aria-haspopup="menu" aria-expanded="false" data-i18n-attr="aria-label" data-i18n-aria-label="gallery.actions">⋮</button>
+      </header>
       <div class="lightbox-stage">
-        <button class="lightbox-nav" id="lightboxPrev" type="button" aria-label="Photo précédente">‹</button>
+        <button class="lightbox-nav" id="lightboxPrev" type="button" aria-label="Image précédente" data-i18n-attr="aria-label" data-i18n-aria-label="gallery.previous">‹</button>
         <img id="lightboxImg" src="" alt="Photo agrandie">
-        <button class="lightbox-nav" id="lightboxNext" type="button" aria-label="Photo suivante">›</button>
+        <button class="lightbox-nav" id="lightboxNext" type="button" aria-label="Image suivante" data-i18n-attr="aria-label" data-i18n-aria-label="gallery.next">›</button>
       </div>
       <div class="lightbox-toolbar">
         <span class="lightbox-counter" id="lightboxCounter" aria-live="polite"></span>
-        <button class="lightbox-favorite" id="lightboxFavorite" type="button" aria-pressed="false">♡ Ajouter aux favoris</button>
-        <button class="lightbox-delete" id="lightboxDelete" type="button">🗑️ Supprimer</button>
+        <button class="gallery-slideshow-toggle" id="gallerySlideshowToggle" type="button" hidden>Ⅱ <span data-i18n="gallery.pause">Pause</span></button>
       </div>
     </div>
+    <div class="gallery-action-menu" id="galleryActionMenu" role="menu" aria-label="Autres actions" data-i18n-attr="aria-label" data-i18n-aria-label="gallery.actions" hidden>
+      <button type="button" role="menuitem" data-gallery-action="zoomIn" data-i18n="gallery.zoomIn">Zoom avant</button>
+      <button type="button" role="menuitem" data-gallery-action="zoomOut" data-i18n="gallery.zoomOut">Zoom arrière</button>
+      <button type="button" role="menuitem" data-gallery-action="rotate" data-i18n="gallery.rotate">Pivoter</button>
+      <button type="button" role="menuitem" data-gallery-action="reset" data-i18n="gallery.reset">Réinitialiser l’affichage</button>
+      <button type="button" role="menuitem" data-gallery-action="favorite" data-i18n="gallery.addFavorite">Ajouter aux favoris</button>
+      <button type="button" role="menuitem" data-gallery-action="share" data-i18n="gallery.share">Partager</button>
+      <button type="button" role="menuitem" data-gallery-action="info" data-i18n="gallery.info">Informations</button>
+      <button type="button" role="menuitem" data-gallery-action="delete" data-i18n="gallery.delete">Supprimer</button>
+    </div>
+    <dialog class="gallery-info-dialog" id="galleryInfoDialog" aria-labelledby="galleryInfoTitle">
+      <div class="gallery-info-shell">
+        <header class="gallery-info-header">
+          <h2 id="galleryInfoTitle" data-i18n="gallery.infoTitle">Informations sur l’image</h2>
+          <button type="button" id="galleryInfoClose" aria-label="Fermer" data-i18n-attr="aria-label" data-i18n-aria-label="gallery.close">×</button>
+        </header>
+        <dl id="galleryInfoDetails"></dl>
+      </div>
+    </dialog>
 
     <!-- Toast -->
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -1004,6 +1044,6 @@
     </div>
   </div>
 
-  <script src="js/script.js?v=20261126c"></script>
+  <script src="js/script.js?v=20261126i"></script>
 </body>
 </html>
