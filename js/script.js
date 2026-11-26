@@ -863,6 +863,26 @@ let previewPartnerAvatarUrl = null;
 let playlistTracks = [];
 let currentTrackIndex = -1;
 let currentAudio = null;
+let vinylRotationAnimation = null;
+let vinylDecelerationFrame = null;
+let vinylDecelerationToken = 0;
+const MEDIA_SETTINGS_STORAGE_KEY = 'carnet_media_preferences';
+const MEDIA_SETTINGS_DEFAULTS = {
+  animations: true,
+  glass: true,
+  density: 'comfortable',
+  photoLayout: 'grid',
+  photoSize: 'medium',
+  photoEffect: 'zoom',
+  showFavorites: true,
+  autoNext: true,
+  shuffle: false,
+  repeat: 'all',
+  playerStyle: 'signature',
+  recordAnimation: true,
+  visualizer: true,
+  playlistOrder: 'added'
+};
 
 /* ===== Storage Helpers ===== */
 
@@ -3374,6 +3394,103 @@ function setAppActiveSection(target) {
   document.getElementById('navToggle')?.setAttribute('aria-expanded', 'false');
 }
 
+function initMediaPageNavigation() {
+  const viewport = document.querySelector('#multimedia .media-pages-viewport');
+  const track = document.getElementById('mediaPagesTrack');
+  const tablist = document.querySelector('#multimedia .media-page-tabs');
+  const tabs = Array.from(tablist?.querySelectorAll('[data-media-page]') || []);
+  const pages = Object.fromEntries(
+    tabs.map(tab => [tab.dataset.mediaPage, document.getElementById(tab.getAttribute('aria-controls'))])
+  );
+  if (!viewport || !track || tabs.length !== 2 || Object.values(pages).some(page => !page)) return;
+
+  let activePage = 'photos';
+  let pointerStart = null;
+  let suppressSwipeClick = false;
+
+  const updateViewportHeight = () => {
+    const page = pages[activePage];
+    if (page) viewport.style.height = `${page.scrollHeight}px`;
+  };
+
+  const selectPage = (pageName, focusTab = false) => {
+    if (!pages[pageName]) return;
+    activePage = pageName;
+    track.dataset.activePage = pageName;
+    tabs.forEach(tab => {
+      const selected = tab.dataset.mediaPage === pageName;
+      tab.classList.toggle('is-active', selected);
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      if (selected && focusTab) tab.focus();
+    });
+    Object.entries(pages).forEach(([name, page]) => {
+      const selected = name === pageName;
+      page.classList.toggle('is-active', selected);
+      page.setAttribute('aria-hidden', String(!selected));
+      page.inert = !selected;
+    });
+    updateViewportHeight();
+  };
+
+  tabs.forEach(tab => tab.addEventListener('click', () => selectPage(tab.dataset.mediaPage)));
+  tablist.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const nextPage = event.key === 'Home' ? 'photos'
+      : event.key === 'End' ? 'music'
+        : event.key === 'ArrowRight' ? 'music' : 'photos';
+    selectPage(nextPage, true);
+  });
+
+  viewport.addEventListener('pointerdown', event => {
+    if (!event.isPrimary || event.button !== 0 ||
+      event.target.closest('button, input, select, textarea, a, [contenteditable="true"], audio, video, [role="button"], [role="slider"]')) return;
+    pointerStart = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      target: event.target
+    };
+    if (event.pointerType === 'mouse') viewport.classList.add('is-dragging');
+  });
+
+  window.addEventListener('pointerup', event => {
+    viewport.classList.remove('is-dragging');
+    if (!pointerStart || event.pointerId !== pointerStart.id) return;
+    const deltaX = event.clientX - pointerStart.x;
+    const deltaY = event.clientY - pointerStart.y;
+    if (Math.abs(deltaX) > 56 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
+      if (activePage === 'photos' && deltaX < 0) selectPage('music');
+      else if (activePage === 'music' && deltaX > 0) selectPage('photos');
+      else {
+        pointerStart = null;
+        return;
+      }
+      suppressSwipeClick = true;
+      window.setTimeout(() => { suppressSwipeClick = false; }, 0);
+    }
+    pointerStart = null;
+  });
+
+  window.addEventListener('pointercancel', () => {
+    pointerStart = null;
+    viewport.classList.remove('is-dragging');
+  });
+
+  document.addEventListener('click', event => {
+    if (!suppressSwipeClick || !event.target.closest('#multimedia')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+
+  if ('ResizeObserver' in window) {
+    const resizeObserver = new ResizeObserver(updateViewportHeight);
+    Object.values(pages).forEach(page => resizeObserver.observe(page));
+  }
+  selectPage('photos');
+}
+
 function ensureAppBackSentinel() {
   if (appBackSentinelActive || !window.history?.pushState) return;
   const state = history.state && typeof history.state === 'object' ? { ...history.state } : {};
@@ -3878,7 +3995,13 @@ function renderLightboxPhoto() {
   if (index < 0) return;
 
   const photo = photos[index];
-  document.getElementById('lightboxImg').src = photo.src;
+  const image = document.getElementById('lightboxImg');
+  image.classList.remove('media-photo-transition');
+  image.src = photo.src;
+  if (getMediaPreferences().photoEffect !== 'none') {
+    void image.offsetWidth;
+    image.classList.add('media-photo-transition');
+  }
   document.getElementById('lightboxCounter').textContent = `${index + 1} / ${photos.length}`;
   const favoriteBtn = document.getElementById('lightboxFavorite');
   favoriteBtn.textContent = photo.favorite ? '♥ Dans vos favoris' : '♡ Ajouter aux favoris';
@@ -3961,14 +4084,166 @@ function initGallery() {
   renderGallery();
 }
 
+function getMediaPreferencesStorageKey() {
+  const profileCode = getPairingState().myCode.trim().toUpperCase();
+  return `${MEDIA_SETTINGS_STORAGE_KEY}:${profileCode}`;
+}
+
+function getMediaPreferences() {
+  const stored = load(getMediaPreferencesStorageKey(), {});
+  const preferences = {
+    ...MEDIA_SETTINGS_DEFAULTS,
+    ...(stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {})
+  };
+  const booleanPreferences = ['animations', 'glass', 'showFavorites', 'autoNext', 'shuffle', 'recordAnimation', 'visualizer'];
+  const validOptions = {
+    density: ['comfortable', 'compact'],
+    photoLayout: ['grid', 'mosaic'],
+    photoSize: ['small', 'medium', 'large'],
+    photoEffect: ['zoom', 'fade', 'none'],
+    repeat: ['off', 'one', 'all'],
+    playerStyle: ['signature', 'compact'],
+    playlistOrder: ['added', 'title', 'recent']
+  };
+
+  booleanPreferences.forEach(name => {
+    if (typeof preferences[name] !== 'boolean') preferences[name] = MEDIA_SETTINGS_DEFAULTS[name];
+  });
+  Object.entries(validOptions).forEach(([name, options]) => {
+    if (!options.includes(preferences[name])) preferences[name] = MEDIA_SETTINGS_DEFAULTS[name];
+  });
+  return preferences;
+}
+
+function applyMediaPreferences(preferences = getMediaPreferences()) {
+  const media = document.getElementById('multimedia');
+  if (!media) return;
+
+  media.dataset.mediaAnimations = String(preferences.animations);
+  media.dataset.mediaGlass = String(preferences.glass);
+  media.dataset.mediaDensity = preferences.density;
+  media.dataset.mediaPhotoLayout = preferences.photoLayout;
+  media.dataset.mediaPhotoSize = preferences.photoSize;
+  media.dataset.mediaShowFavorites = String(preferences.showFavorites);
+  media.dataset.mediaPlayerStyle = preferences.playerStyle;
+  media.dataset.mediaRecordAnimation = String(preferences.recordAnimation);
+  media.dataset.mediaVisualizer = String(preferences.visualizer);
+  document.documentElement.dataset.mediaPhotoEffect = preferences.photoEffect;
+  document.documentElement.dataset.mediaAnimations = String(preferences.animations);
+  document.documentElement.dataset.mediaGlass = String(preferences.glass);
+  updateVinylRotation(Boolean(playlistTracks[currentTrackIndex] && currentAudio && !currentAudio.paused));
+
+  document.querySelectorAll('[data-media-setting]').forEach(control => {
+    const value = preferences[control.dataset.mediaSetting];
+    if (control.type === 'checkbox') control.checked = value;
+    else control.value = value;
+  });
+}
+
+function initMediaSettings() {
+  const dialog = document.getElementById('mediaSettingsDialog');
+  const openButton = document.getElementById('mediaSettingsOpen');
+  const closeButton = document.getElementById('mediaSettingsClose');
+  const doneButton = document.getElementById('mediaSettingsDone');
+  const tabs = Array.from(document.querySelectorAll('[data-media-settings-tab]'));
+  if (!dialog || !openButton || !tabs.length) return;
+
+  let activeCategory = 'general';
+  const selectCategory = (category, focus = false) => {
+    activeCategory = category;
+    tabs.forEach(tab => {
+      const selected = tab.dataset.mediaSettingsTab === category;
+      tab.classList.toggle('is-active', selected);
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      if (selected && focus) tab.focus();
+    });
+    document.querySelectorAll('[data-media-settings-panel]').forEach(panel => {
+      const selected = panel.dataset.mediaSettingsPanel === category;
+      panel.hidden = !selected;
+      panel.classList.toggle('is-active', selected);
+    });
+  };
+
+  tabs.forEach(tab => tab.addEventListener('click', () => selectCategory(tab.dataset.mediaSettingsTab)));
+  dialog.querySelector('.media-settings-tabs')?.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const nextCategory = event.key === 'Home' ? 'general'
+      : event.key === 'End' ? 'music'
+        : event.key === 'ArrowRight' ? 'photos' : 'general';
+    const currentIndex = tabs.findIndex(tab => tab.dataset.mediaSettingsTab === activeCategory);
+    const orderedCategories = tabs.map(tab => tab.dataset.mediaSettingsTab);
+    const nextIndex = event.key === 'ArrowRight'
+      ? (currentIndex + 1) % tabs.length
+      : event.key === 'ArrowLeft'
+        ? (currentIndex - 1 + tabs.length) % tabs.length
+        : orderedCategories.indexOf(nextCategory);
+    selectCategory(orderedCategories[nextIndex], true);
+  });
+
+  openButton.addEventListener('click', () => {
+    applyMediaPreferences();
+    dialog.showModal();
+    tabs.find(tab => tab.dataset.mediaSettingsTab === activeCategory)?.focus();
+  });
+  closeButton?.addEventListener('click', () => dialog.close());
+  doneButton?.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog) dialog.close();
+  });
+  dialog.addEventListener('close', () => openButton.focus());
+
+  dialog.querySelectorAll('[data-media-setting]').forEach(control => {
+    control.addEventListener('change', () => {
+      const name = control.dataset.mediaSetting;
+      const value = control.type === 'checkbox' ? control.checked : control.value;
+      const preferences = { ...getMediaPreferences(), [name]: value };
+      save(getMediaPreferencesStorageKey(), preferences);
+      applyMediaPreferences(preferences);
+
+      if (name === 'photoEffect' && !document.getElementById('lightbox').hidden) {
+        renderLightboxPhoto();
+      }
+      if (name === 'playlistOrder') {
+        renderPlaylist();
+      }
+    });
+  });
+
+  window.addEventListener('storage', event => {
+    if (event.key === getMediaPreferencesStorageKey()) applyMediaPreferences();
+  });
+
+  selectCategory(activeCategory);
+  applyMediaPreferences();
+}
+
+function sortPlaylistTracks(tracks, order = getMediaPreferences().playlistOrder) {
+  const sortedTracks = [...tracks];
+  if (order === 'title') {
+    sortedTracks.sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }));
+  } else if (order === 'recent') {
+    sortedTracks.sort((left, right) => (right.added || 0) - (left.added || 0));
+  } else {
+    sortedTracks.sort((left, right) => (left.added || 0) - (right.added || 0));
+  }
+  return sortedTracks;
+}
+
 async function renderPlaylist() {
   try {
-    const tracks = await getStoredAudios();
-    playlistTracks = tracks;
+    const currentTrackId = playlistTracks[currentTrackIndex]?.id;
+    playlistTracks = sortPlaylistTracks(await getStoredAudios());
+    if (currentTrackId) {
+      currentTrackIndex = playlistTracks.findIndex(track => track.id === currentTrackId);
+    }
+    const tracks = playlistTracks;
     const list = document.getElementById('playlistList');
 
     if (!tracks.length) {
       list.innerHTML = '<div class="empty-state"><span class="empty-icon">🎵</span><p>Aucune musique pour l\'instant</p><p class="empty-sub">Ajoutez vos pistes préférées !</p></div>';
+      updatePlayerPlaybackState();
       return;
     }
 
@@ -3976,6 +4251,8 @@ async function renderPlaylist() {
     tracks.forEach((track, index) => {
       const item = document.createElement('div');
       item.className = 'playlist-item';
+      item.classList.toggle('is-current', index === currentTrackIndex);
+      item.classList.toggle('is-playing', index === currentTrackIndex && Boolean(currentAudio && !currentAudio.paused));
       item.innerHTML = `
         <div class="playlist-info">
           <span class="playlist-icon">🎶</span>
@@ -4029,7 +4306,7 @@ async function deleteTrack(id) {
     return;
   }
 
-  const refreshedTracks = await getStoredAudios();
+  const refreshedTracks = sortPlaylistTracks(await getStoredAudios());
   playlistTracks = refreshedTracks;
 
   if (wasCurrentTrack) {
@@ -4087,15 +4364,81 @@ function updatePlayerUI() {
 function updatePlayerPlaybackState() {
   const isPlaying = Boolean(playlistTracks[currentTrackIndex] && currentAudio && !currentAudio.paused);
   document.getElementById('playlistPlayer').classList.toggle('is-playing', isPlaying);
+  updateVinylRotation(isPlaying);
+  document.querySelectorAll('#playlistList .playlist-item').forEach((item, index) => {
+    const isCurrent = index === currentTrackIndex;
+    item.classList.toggle('is-current', isCurrent);
+    item.classList.toggle('is-playing', isCurrent && isPlaying);
+  });
   const button = document.getElementById('playPauseBtn');
   button.textContent = isPlaying ? '⏸️' : '▶️';
   button.setAttribute('aria-label', isPlaying ? 'Mettre la piste en pause' : 'Lire la piste');
 }
 
+function updateVinylRotation(isPlaying) {
+  const cover = document.getElementById('trackCover');
+  const media = document.getElementById('multimedia');
+  if (!cover || !media) return;
+
+  const motionAllowed = media.dataset.mediaAnimations !== 'false'
+    && media.dataset.mediaRecordAnimation !== 'false'
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!motionAllowed) {
+    vinylDecelerationToken += 1;
+    if (vinylDecelerationFrame !== null) cancelAnimationFrame(vinylDecelerationFrame);
+    vinylDecelerationFrame = null;
+    vinylRotationAnimation?.cancel();
+    vinylRotationAnimation = null;
+    cover.classList.remove('is-rotating');
+    return;
+  }
+
+  if (typeof cover.animate !== 'function') {
+    cover.classList.toggle('is-rotating', isPlaying);
+    return;
+  }
+
+  if (isPlaying) {
+    vinylDecelerationToken += 1;
+    if (vinylDecelerationFrame !== null) cancelAnimationFrame(vinylDecelerationFrame);
+    vinylDecelerationFrame = null;
+    if (!vinylRotationAnimation || vinylRotationAnimation.playState === 'idle') {
+      vinylRotationAnimation = cover.animate(
+        [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }],
+        { duration: 18000, iterations: Infinity, easing: 'linear' }
+      );
+      vinylRotationAnimation.pause();
+    }
+    vinylRotationAnimation.playbackRate = 1;
+    vinylRotationAnimation.play();
+    return;
+  }
+
+  if (!vinylRotationAnimation || vinylRotationAnimation.playState !== 'running' || vinylDecelerationFrame !== null) return;
+
+  const animation = vinylRotationAnimation;
+  const initialRate = animation.playbackRate;
+  const startTime = performance.now();
+  const token = ++vinylDecelerationToken;
+  const decelerate = now => {
+    if (token !== vinylDecelerationToken) return;
+    const progress = Math.min((now - startTime) / 750, 1);
+    animation.playbackRate = initialRate * (1 - progress) ** 2;
+    if (progress < 1) {
+      vinylDecelerationFrame = requestAnimationFrame(decelerate);
+    } else {
+      animation.pause();
+      animation.playbackRate = 1;
+      vinylDecelerationFrame = null;
+    }
+  };
+  vinylDecelerationFrame = requestAnimationFrame(decelerate);
+}
+
 function getAudioPlayer() {
   if (!currentAudio) {
     currentAudio = new Audio();
-    currentAudio.addEventListener('ended', () => playNextTrack());
+    currentAudio.addEventListener('ended', () => playNextTrack(true));
     currentAudio.addEventListener('play', updatePlayerPlaybackState);
     currentAudio.addEventListener('pause', updatePlayerPlaybackState);
     currentAudio.addEventListener('timeupdate', () => {
@@ -4148,9 +4491,31 @@ function playPauseTrack() {
   updatePlayerUI();
 }
 
-function playNextTrack() {
+function playNextTrack(automatic = false) {
   if (!playlistTracks.length) return;
-  const nextIndex = currentTrackIndex >= playlistTracks.length - 1 ? 0 : currentTrackIndex + 1;
+  const preferences = getMediaPreferences();
+  if (automatic && preferences.repeat === 'one') {
+    const audio = getAudioPlayer();
+    audio.currentTime = 0;
+    audio.play().catch(() => showToast('Lecture impossible pour cette piste.'));
+    return;
+  }
+  if (automatic && !preferences.autoNext) {
+    updatePlayerPlaybackState();
+    return;
+  }
+  if (automatic && currentTrackIndex >= playlistTracks.length - 1 && preferences.repeat !== 'all') {
+    updatePlayerPlaybackState();
+    return;
+  }
+
+  let nextIndex;
+  if (preferences.shuffle && playlistTracks.length > 1) {
+    const offset = Math.floor(Math.random() * (playlistTracks.length - 1)) + 1;
+    nextIndex = currentTrackIndex < 0 ? Math.floor(Math.random() * playlistTracks.length) : (currentTrackIndex + offset) % playlistTracks.length;
+  } else {
+    nextIndex = currentTrackIndex >= playlistTracks.length - 1 ? 0 : currentTrackIndex + 1;
+  }
   playTrack(nextIndex);
 }
 
@@ -4417,6 +4782,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCouplePhoto();
   initDateModal();
   initNavigation();
+  initMediaSettings();
+  initMediaPageNavigation();
   initSettingsForm();
   initOnboarding();
   initMemories();
