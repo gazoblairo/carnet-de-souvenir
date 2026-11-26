@@ -18,6 +18,7 @@ const STORAGE_KEYS = {
 const GAME_CATEGORIES = {
   romantique: {
     label: '🟢 Romantique',
+    labelKey: 'game.romantic',
     actions: [
       'Envoie un texto tendre à ton partenaire avec un mot doux et un cœur.',
       'Prépare un café ou un thé à deux et partage un moment sans téléphone.',
@@ -243,6 +244,7 @@ const GAME_CATEGORIES = {
   },
   drole: {
     label: '🟡 Drôle',
+    labelKey: 'game.funny',
     actions: [
       'Fais une imitation de ton partenaire pendant 30 secondes sans rire.',
       'Chante une chanson de votre choix en mode “téléphone portable au maximum”.',
@@ -388,6 +390,7 @@ const GAME_CATEGORIES = {
   },
   audacieux: {
     label: '🔴 Audacieux',
+    labelKey: 'game.bold',
     actions: [
       'Propose à votre partenaire un baiser surprise avec un thème mystérieux.',
       'Créez un “rituel secret” à deux pour cette soirée.',
@@ -501,22 +504,9 @@ const GAME_CATEGORIES = {
 
 const GAME_STORAGE_KEY = STORAGE_KEYS.gameState;
 const GAME_HISTORY_LIMIT = 20;
-const GAME_LOVE_MESSAGES = [
-  'À travers chaque saison, c’est encore vers toi que mon cœur choisit de revenir.',
-  'Les plus beaux instants ne sont pas parfaits : ils deviennent précieux parce qu’on les partage.',
-  'Dans le calme comme dans les éclats de rire, ta présence est l’un de mes plus beaux refuges.',
-  'Notre histoire se construit dans ces petits gestes qui disent doucement : je suis là, avec toi.',
-  'Je nous souhaite encore mille souvenirs, et cette même tendresse pour les accueillir.',
-  'À tes côtés, même les journées ordinaires prennent une place particulière dans mon cœur.',
-  'Ce qui nous unit grandit chaque fois qu’on s’écoute, qu’on se choisit et qu’on avance ensemble.',
-  'Ton sourire a cette façon unique de rendre le monde un peu plus doux.',
-  'Aimer, c’est découvrir encore et encore la beauté de la personne qui est près de soi.',
-  'Merci d’être cette personne avec qui le silence, les rêves et les fous rires ont leur place.',
-  'Parmi tous les chemins possibles, je suis heureux·se que le nôtre se poursuive côte à côte.',
-  'Que ce petit défi devienne une nouvelle occasion de se rapprocher et de se faire du bien.'
-];
 let activeGameSpin = false;
-let lastGameLoveMessage = '';
+let lastGameLoveMessageIndex = -1;
+let lastGameResult = null;
 
 function getGameState() {
   return load(GAME_STORAGE_KEY, { category: 'romantique', history: [], recent: [] });
@@ -528,6 +518,54 @@ function saveGameState(state) {
 
 function getGamePool(category) {
   return GAME_CATEGORIES[category] || GAME_CATEGORIES.romantique;
+}
+
+function getGameCategoryLabel(category) {
+  const pool = getGamePool(category);
+  return window.I18n?.t(pool.labelKey) || pool.label;
+}
+
+function updateGameStatus(category, spinning = false) {
+  const status = document.getElementById('gameStatus');
+  if (!status) return;
+  if (spinning) {
+    status.textContent = window.I18n?.t('game.wheelSpinning') || 'Roulette en mouvement…';
+    return;
+  }
+
+  let selectedLabel = document.getElementById('selectedCategoryLabel');
+  if (!selectedLabel) {
+    selectedLabel = document.createElement('span');
+    selectedLabel.id = 'selectedCategoryLabel';
+  }
+  selectedLabel.textContent = getGameCategoryLabel(category);
+  status.replaceChildren(
+    document.createTextNode(`${window.I18n?.t('game.statusSelected') || 'Catégorie sélectionnée :'} `),
+    selectedLabel
+  );
+}
+
+function updateGameLanguage() {
+  const category = document.querySelector('.category-btn.active')?.dataset.category || 'romantique';
+  updateGameStatus(category, activeGameSpin);
+  const spinButton = document.getElementById('spinGameBtn');
+  if (spinButton && !activeGameSpin) {
+    spinButton.textContent = window.I18n?.t('game.spin') || '❤️ FAIRE TOURNER';
+  } else if (spinButton) {
+    spinButton.textContent = window.I18n?.t('game.spinSpinning') || '✨ Roue en mouvement…';
+  }
+
+  if (!lastGameResult) return;
+  document.getElementById('gameResultBadge').textContent = window.I18n?.t(
+    lastGameResult.isAction ? 'game.action' : 'game.truth'
+  ) || (lastGameResult.isAction ? '❤️ Action' : '💬 Vérité');
+  document.getElementById('gameResultTitle').textContent = window.I18n?.t(
+    lastGameResult.isAction ? 'game.actionChosen' : 'game.truthChosen'
+  ) || (lastGameResult.isAction ? 'Action choisie' : 'Vérité choisie');
+  document.getElementById('gameResultCategory').textContent = getGameCategoryLabel(lastGameResult.category);
+  document.getElementById('gameResultLove').textContent = window.I18n?.t(
+    `game.love.${lastGameResult.loveIndex}`
+  ) || '';
 }
 
 function pickGameItem(category, isAction) {
@@ -574,10 +612,10 @@ function createConfettiBurst(container) {
 }
 
 function getGameLoveMessage() {
-  const available = GAME_LOVE_MESSAGES.filter(message => message !== lastGameLoveMessage);
-  const message = available[Math.floor(Math.random() * available.length)] || GAME_LOVE_MESSAGES[0];
-  lastGameLoveMessage = message;
-  return message;
+  const available = Array.from({ length: 12 }, (_, index) => index + 1)
+    .filter(index => index !== lastGameLoveMessageIndex);
+  lastGameLoveMessageIndex = available[Math.floor(Math.random() * available.length)] || 1;
+  return window.I18n?.t(`game.love.${lastGameLoveMessageIndex}`) || '';
 }
 
 function createWheelSparkles(wrapper) {
@@ -610,14 +648,11 @@ function spinWheel(category, direction = 1) {
   const resultLove = document.getElementById('gameResultLove');
   const resultText = document.getElementById('gameResultText');
   const resultCategory = document.getElementById('gameResultCategory');
-  const status = document.getElementById('gameStatus');
-  const selectedLabel = document.getElementById('selectedCategoryLabel');
   const spinButton = document.getElementById('spinGameBtn');
   const categoryButtons = document.querySelectorAll('.category-btn');
   if (!wheel || !wrapper || !resultDialog || !resultCard || !spinButton) return;
 
   const state = getGameState();
-  const pool = getGamePool(category);
   const isAction = Math.random() > 0.5;
   const chosen = pickGameItem(category, isAction);
   const segmentIndexes = isAction ? [0, 2, 4, 6] : [1, 3, 5, 7];
@@ -651,13 +686,15 @@ function spinWheel(category, direction = 1) {
     wrapper.classList.remove('is-spinning');
     wheel.classList.remove('is-spinning');
 
-    resultBadge.textContent = isAction ? '❤️ Action' : '💬 Vérité';
-    resultTitle.textContent = isAction ? 'Action choisie' : 'Vérité choisie';
-    if (resultLove) resultLove.textContent = getGameLoveMessage();
+    const loveMessage = getGameLoveMessage();
+    lastGameResult = { isAction, category, loveIndex: lastGameLoveMessageIndex };
+    resultBadge.textContent = window.I18n?.t(isAction ? 'game.action' : 'game.truth') || (isAction ? '❤️ Action' : '💬 Vérité');
+    resultTitle.textContent = window.I18n?.t(isAction ? 'game.actionChosen' : 'game.truthChosen') || (isAction ? 'Action choisie' : 'Vérité choisie');
+    if (resultLove) resultLove.textContent = loveMessage;
+    resultText.removeAttribute('data-i18n');
     resultText.textContent = chosen;
-    resultCategory.textContent = pool.label;
-    selectedLabel.textContent = pool.label;
-    status.innerHTML = `Catégorie sélectionnée : <span id="selectedCategoryLabel">${pool.label}</span>`;
+    resultCategory.textContent = getGameCategoryLabel(category);
+    updateGameStatus(category);
     resultCard.hidden = false;
     resultCard.classList.add('show');
     createConfettiBurst(resultDialog);
@@ -665,7 +702,7 @@ function spinWheel(category, direction = 1) {
     activeGameSpin = false;
     categoryButtons.forEach(button => { button.disabled = false; });
     spinButton.disabled = false;
-    spinButton.textContent = '❤️ FAIRE TOURNER';
+    spinButton.textContent = window.I18n?.t('game.spin') || '❤️ FAIRE TOURNER';
   };
   const onWheelTransitionEnd = event => {
     if (event.target === wheel && event.propertyName === 'transform') finishSpin();
@@ -677,9 +714,9 @@ function spinWheel(category, direction = 1) {
   wrapper.classList.add('is-spinning');
   wheel.classList.add('is-spinning');
   categoryButtons.forEach(button => { button.disabled = true; });
-  status.innerHTML = 'Roulette en mouvement…';
+  updateGameStatus(category, true);
   spinButton.disabled = true;
-  spinButton.textContent = '✨ Roue en mouvement…';
+  spinButton.textContent = window.I18n?.t('game.spinSpinning') || '✨ Roue en mouvement…';
   createWheelSparkles(wrapper);
   if (!reducedMotion) {
     window.setTimeout(() => {
@@ -709,7 +746,6 @@ function initGame() {
   const resultDialog = document.getElementById('gameResultDialog');
   const resultCard = document.getElementById('gameResultCard');
   const closeResult = () => resultDialog.close();
-  const selectedLabel = document.getElementById('selectedCategoryLabel');
   const wheel = document.getElementById('gameWheel');
   const wrapper = document.getElementById('wheelWrapper');
   let currentCategory = 'romantique';
@@ -720,8 +756,7 @@ function initGame() {
       categoryButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentCategory = btn.dataset.category;
-      selectedLabel.textContent = getGamePool(currentCategory).label;
-      document.getElementById('gameStatus').innerHTML = `Catégorie sélectionnée : <span id="selectedCategoryLabel">${getGamePool(currentCategory).label}</span>`;
+      updateGameStatus(currentCategory);
     });
   });
 
@@ -735,6 +770,8 @@ function initGame() {
     closeResult();
     spinWheel(currentCategory);
   });
+  window.addEventListener('carnet:languagechange', updateGameLanguage);
+  updateGameLanguage();
   resultDialog.addEventListener('click', event => {
     if (event.target === resultDialog) closeResult();
   });
@@ -1768,7 +1805,7 @@ function initMessageSettingsPanel() {
   document.getElementById('exportConversationBtn')?.addEventListener('click', () => {
     const state = window.MessageModule?.getState?.();
     if (!state?.ready || !state.conversationCode) {
-      showToast('La conversation n’est pas encore chargée.');
+      showToast(window.I18n?.t('chat.notLoaded') || 'La conversation n’est pas encore chargée.');
       return;
     }
     const payload = {
@@ -1874,10 +1911,11 @@ function getMessageContentMarkup(message, allMessages) {
   return `${replyMarkup}<div>${escapeHtml(message.text || 'Message')}</div>`;
 }
 
-function renderMessages(filter = '', sortValue = 'date_desc') {
+function renderMessages(filter = '', sortValue = 'date_desc', preserveScroll = false) {
   const messages = getMessages();
   const list = document.getElementById('modernMessagesList');
   const empty = document.getElementById('modernMessagesEmpty');
+  const previousScrollTop = preserveScroll ? list?.scrollTop : null;
   const search = document.getElementById('messageSearch');
   const searchValue = (filter || search?.value || '').toLowerCase();
   const typing = document.getElementById('typingIndicator');
@@ -1924,7 +1962,7 @@ function renderMessages(filter = '', sortValue = 'date_desc') {
     if (dateKey !== previousDate) {
       const separator = document.createElement('div');
       separator.className = 'message-date-separator';
-      separator.textContent = messageDate.toLocaleDateString('fr-FR', {
+      separator.textContent = messageDate.toLocaleDateString(window.I18n?.getLocale() || 'fr-FR', {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
@@ -1975,7 +2013,7 @@ function renderMessages(filter = '', sortValue = 'date_desc') {
     list.appendChild(bubble);
   });
 
-  list.scrollTop = list.scrollHeight;
+  list.scrollTop = preserveScroll ? previousScrollTop : list.scrollHeight;
 }
 
 function updateComposerState() {
@@ -2022,7 +2060,7 @@ function createMessagePayload(text, type = 'text', metadata = null, replyId = nu
     text: text || '',
     type,
     createdAt: Date.now(),
-    time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    time: new Date().toLocaleTimeString(window.I18n?.getLocale() || 'fr-FR', { hour: '2-digit', minute: '2-digit' }),
     status: 'read',
     reactions: {},
     pinned: false,
@@ -2044,13 +2082,13 @@ async function handleMessageAction(action, messageId, reaction = null) {
   if (action === 'reply') {
     activeReplyMessageId = messageId;
     updateComposerState();
-    showToast('Réponse préparée ✨');
+    showToast(window.I18n?.t('chat.replyPrepared') || 'Réponse préparée ✨');
     return;
   }
 
   if (action === 'edit') {
     if (target.sender !== 'me') {
-      showToast('Seuls vos messages peuvent être modifiés');
+      showToast(window.I18n?.t('chat.ownMessageEditOnly') || 'Seuls vos messages peuvent être modifiés');
       return;
     }
     activeEditMessageId = messageId;
@@ -2060,7 +2098,7 @@ async function handleMessageAction(action, messageId, reaction = null) {
       composer.focus();
     }
     updateComposerState();
-    showToast('Édition activée');
+    showToast(window.I18n?.t('chat.editingEnabled') || 'Édition activée');
     return;
   }
 
@@ -2068,7 +2106,7 @@ async function handleMessageAction(action, messageId, reaction = null) {
     const text = target.text || target.metadata?.name || '';
     if (text) {
       navigator.clipboard?.writeText(text).catch(() => {});
-      showToast('Message copié');
+      showToast(window.I18n?.t('chat.messageCopied') || 'Message copié');
     }
     return;
   }
@@ -2081,7 +2119,7 @@ async function handleMessageAction(action, messageId, reaction = null) {
       target.pinned = !target.pinned;
       saveMessages(messages);
     }
-    showToast(next.pinned ? 'Message épinglé' : 'Message désépinglé');
+    showToast(window.I18n?.t(next.pinned ? 'chat.messagePinned' : 'chat.messageUnpinned'));
     return;
   }
 
@@ -2093,7 +2131,7 @@ async function handleMessageAction(action, messageId, reaction = null) {
       target.favorite = !target.favorite;
       saveMessages(messages);
     }
-    showToast(next.favorite ? 'Ajouté aux favoris' : 'Retiré des favoris');
+    showToast(window.I18n?.t(next.favorite ? 'chat.addedToFavorites' : 'chat.removedFromFavorites'));
     return;
   }
 
@@ -2116,7 +2154,7 @@ async function handleMessageAction(action, messageId, reaction = null) {
       target.deletedForMe = true;
       saveMessages(messages);
     }
-    showToast('Supprimé pour vous');
+    showToast(window.I18n?.t('chat.deletedForYou') || 'Supprimé pour vous');
     return;
   }
 
@@ -2127,7 +2165,7 @@ async function handleMessageAction(action, messageId, reaction = null) {
       target.deletedForEveryone = true;
       saveMessages(messages);
     }
-    showToast('Supprimé pour tout le monde');
+    showToast(window.I18n?.t('chat.deletedForEveryone') || 'Supprimé pour tout le monde');
   }
 }
 
@@ -2153,7 +2191,7 @@ async function sendTextMessage(text) {
   const composer = document.getElementById('messageComposer');
   const pairing = getPairingState();
   if (!pairing.linked) {
-    showToast('Liez votre compte à votre partenaire pour envoyer des messages.');
+    showToast(window.I18n?.t('chat.linkPartnerToSend') || 'Liez votre compte à votre partenaire pour envoyer des messages.');
     return;
   }
 
@@ -2161,7 +2199,7 @@ async function sendTextMessage(text) {
     && window.MessageModule.getState
     && window.MessageModule.getState().ready;
   if (!messageModuleReady || !window.supabaseClient) {
-    showToast('La messagerie n’est pas connectée. Votre message n’a pas été envoyé.');
+    showToast(window.I18n?.t('chat.connectionSendError') || 'La messagerie n’est pas connectée. Votre message n’a pas été envoyé.');
     return;
   }
 
@@ -2174,7 +2212,7 @@ async function sendTextMessage(text) {
     if (!target) {
       isSendingMessage = false;
       if (sendButton) sendButton.disabled = false;
-      showToast('Ce message n’est plus disponible.');
+      showToast(window.I18n?.t('chat.messageUnavailable') || 'Ce message n’est plus disponible.');
       return;
     }
 
@@ -2182,11 +2220,11 @@ async function sendTextMessage(text) {
       const updated = await window.MessageModule.updateMessage(activeEditMessageId, {
         text: trimmed,
         edited: true,
-        time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString(window.I18n?.getLocale() || 'fr-FR', { hour: '2-digit', minute: '2-digit' })
       });
       if (!updated) throw new Error('Message update failed');
       activeEditMessageId = null;
-      showToast('Message modifié ✨');
+      showToast(window.I18n?.t('chat.messageEdited') || 'Message modifié ✨');
     } finally {
       isSendingMessage = false;
       if (sendButton) sendButton.disabled = false;
@@ -2194,7 +2232,7 @@ async function sendTextMessage(text) {
   } else {
     try {
       await window.MessageModule.sendTextMessage(trimmed, activeReplyMessageId);
-      showToast('Message envoyé ✨');
+      showToast(window.I18n?.t('chat.messageSent') || 'Message envoyé ✨');
     } finally {
       isSendingMessage = false;
       if (sendButton) sendButton.disabled = false;
@@ -2249,7 +2287,7 @@ async function attachMedia(type, inputId, fallbackText) {
 
     messages.push(createMessagePayload(messageText, type, metadata, activeReplyMessageId));
     saveMessages(messages);
-    showToast('Pièce jointe envoyée');
+    showToast(window.I18n?.t('chat.attachmentSent') || 'Pièce jointe envoyée');
     activeReplyMessageId = null;
     updateComposerState();
   };
@@ -2274,7 +2312,7 @@ function ensureDefaultMessages(messages) {
 }
 
 async function deleteTimelineItem(id, type) {
-  if (!window.confirm('Supprimer cet élément de la chronologie ?')) return;
+  if (!window.confirm(window.I18n?.t('timeline.deleteConfirm') || 'Supprimer cet élément de la chronologie ?')) return;
 
   if (type === 'Souvenir') {
     const memories = getMemories().filter(memory => memory.id !== id);
@@ -2291,7 +2329,7 @@ async function deleteTimelineItem(id, type) {
     saveDates(dates);
   }
 
-  showToast('✅ Événement supprimé.');
+  showToast(window.I18n?.t('timeline.deleted') || '✅ Événement supprimé.');
 }
 
 function getDates() {
@@ -2332,7 +2370,7 @@ function renderDates() {
           <div class="memory-date">${formatDate(entry.date)}</div>
         </div>
         <div class="memory-actions">
-          <button data-action="delete-date" data-id="${entry.id}" title="Supprimer">🗑️</button>
+          <button data-action="delete-date" data-id="${entry.id}" title="${window.I18n?.t('gallery.delete') || 'Supprimer'}">🗑️</button>
         </div>
       `;
       list.appendChild(card);
@@ -2344,23 +2382,23 @@ function renderDates() {
 }
 
 function addDateEntry() {
-  const title = window.prompt('Nom de l’événement', '');
+  const title = window.prompt(window.I18n?.t('dates.titlePrompt') || 'Nom de l’événement', '');
   if (title === null) return;
-  const date = window.prompt('Date (AAAA-MM-JJ)', new Date().toISOString().split('T')[0]);
+  const date = window.prompt(window.I18n?.t('dates.datePrompt') || 'Date (AAAA-MM-JJ)', new Date().toISOString().split('T')[0]);
   if (date === null) return;
   if (!title.trim() || !date.trim()) return;
 
   const dates = getDates();
   dates.push({ id: generateId(), title: title.trim(), date: date.trim() });
   saveDates(dates);
-  showToast('Événement ajouté 📅');
+  showToast(window.I18n?.t('dates.added') || 'Événement ajouté 📅');
 }
 
 function deleteDate(id) {
-  if (!window.confirm('Supprimer cet événement ?')) return;
+  if (!window.confirm(window.I18n?.t('dates.deleteConfirm') || 'Supprimer cet événement ?')) return;
   const dates = getDates().filter(entry => entry.id !== id);
   saveDates(dates);
-  showToast('Événement supprimé');
+  showToast(window.I18n?.t('dates.deleted') || 'Événement supprimé');
 }
 
 function getGoals() {
@@ -2393,7 +2431,7 @@ function renderGoals() {
   if (goals.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.innerHTML = '<span class="empty-icon">🎯</span><p>Aucun objectif pour l’instant</p><p class="empty-sub">Ajoutez vos rêves de couple.</p>';
+    empty.innerHTML = `<span class="empty-icon">🎯</span><p>${window.I18n?.t('goals.empty') || 'Aucun objectif pour l’instant'}</p><p class="empty-sub">${window.I18n?.t('goals.emptyHelp') || 'Ajoutez vos rêves de couple.'}</p>`;
     list.appendChild(empty);
     return;
   }
@@ -2407,8 +2445,8 @@ function renderGoals() {
         <div class="memory-title">${escapeHtml(goal.title)}</div>
       </div>
       <div class="memory-actions">
-        <button data-action="toggle-goal" data-id="${goal.id}" title="Marquer comme fait">✓</button>
-        <button data-action="delete-goal" data-id="${goal.id}" title="Supprimer">🗑️</button>
+        <button data-action="toggle-goal" data-id="${goal.id}" title="${window.I18n?.t('goals.markDone') || 'Marquer comme fait'}">✓</button>
+        <button data-action="delete-goal" data-id="${goal.id}" title="${window.I18n?.t('gallery.delete') || 'Supprimer'}">🗑️</button>
       </div>
     `;
     list.appendChild(item);
@@ -2424,7 +2462,7 @@ function renderGoals() {
 }
 
 function addGoal() {
-  const title = window.prompt('Nouvel objectif', '');
+  const title = window.prompt(window.I18n?.t('goals.newPrompt') || 'Nouvel objectif', '');
   if (title === null) return;
   const value = title.trim();
   if (!value) return;
@@ -2432,7 +2470,7 @@ function addGoal() {
   const goals = getGoals();
   goals.push({ id: generateId(), title: value, completed: false });
   saveGoals(goals);
-  showToast('Objectif ajouté 🎯');
+  showToast(window.I18n?.t('goals.added') || 'Objectif ajouté 🎯');
 }
 
 function toggleGoal(id) {
@@ -2441,10 +2479,10 @@ function toggleGoal(id) {
 }
 
 function deleteGoal(id) {
-  if (!window.confirm('Supprimer cet objectif ?')) return;
+  if (!window.confirm(window.I18n?.t('goals.deleteConfirm') || 'Supprimer cet objectif ?')) return;
   const goals = getGoals().filter(goal => goal.id !== id);
   saveGoals(goals);
-  showToast('Objectif supprimé');
+  showToast(window.I18n?.t('goals.deleted') || 'Objectif supprimé');
 }
 
 function getPlaces() {
@@ -2462,7 +2500,7 @@ function renderPlaces() {
   if (!container) return;
 
   if (places.length === 0) {
-    container.innerHTML = '<div class="empty-state"><span class="empty-icon">🗺️</span><p>Aucun lieu enregistré</p><p class="empty-sub">Ajoutez vos endroits préférés.</p></div>';
+    container.innerHTML = `<div class="empty-state"><span class="empty-icon">🗺️</span><p>${window.I18n?.t('places.empty') || 'Aucun lieu enregistré'}</p><p class="empty-sub">${window.I18n?.t('places.emptyHelp') || 'Ajoutez vos endroits préférés.'}</p></div>`;
     return;
   }
 
@@ -2476,7 +2514,7 @@ function renderPlaces() {
       <span class="memory-mood">📍</span>
       <div class="memory-content">
         <div class="memory-title">${escapeHtml(place.name)}</div>
-        <div class="memory-date">${escapeHtml(place.note || 'Lieu enregistré')}</div>
+        <div class="memory-date">${escapeHtml(place.note || window.I18n?.t('places.defaultName') || 'Lieu')}</div>
       </div>
     `;
     list.appendChild(card);
@@ -2485,14 +2523,14 @@ function renderPlaces() {
 }
 
 function addPlace() {
-  const name = window.prompt('Nom du lieu', '');
+  const name = window.prompt(window.I18n?.t('places.namePrompt') || 'Nom du lieu', '');
   if (name === null) return;
-  const note = window.prompt('Note ou souvenir associé', '');
+  const note = window.prompt(window.I18n?.t('places.notePrompt') || 'Note ou souvenir associé', '');
   if (note === null) return;
   const places = getPlaces();
-  places.push({ id: generateId(), name: name.trim() || 'Lieu', note: note.trim() || '' });
+  places.push({ id: generateId(), name: name.trim() || window.I18n?.t('places.defaultName') || 'Lieu', note: note.trim() || '' });
   savePlaces(places);
-  showToast('Lieu ajouté 📍');
+  showToast(window.I18n?.t('places.added') || 'Lieu ajouté 📍');
 }
 
 function renderTimeline() {
@@ -2508,7 +2546,7 @@ function renderTimeline() {
   list.innerHTML = '';
 
   if (items.length === 0) {
-    list.innerHTML = '<div class="empty-state"><span class="empty-icon">⏳</span><p>Votre histoire commence ici.</p><p class="empty-sub">Ajoutez des souvenirs, messages ou dates.</p></div>';
+    list.innerHTML = `<div class="empty-state"><span class="empty-icon">⏳</span><p>${window.I18n?.t('timeline.empty') || 'Votre histoire commence ici.'}</p><p class="empty-sub">${window.I18n?.t('timeline.emptyHelp') || 'Ajoutez des souvenirs, messages ou dates.'}</p></div>`;
     return;
   }
 
@@ -2519,10 +2557,13 @@ function renderTimeline() {
       <span class="memory-mood">${item.icon}</span>
       <div class="memory-content">
         <div class="memory-title">${escapeHtml(item.title)}</div>
-        <div class="memory-date">${escapeHtml(item.type)} · ${formatDate(item.date)}</div>
+        <div class="memory-date">${escapeHtml(window.I18n?.t(
+          item.type === 'Souvenir' ? 'timeline.typeMemory'
+            : item.type === 'Message' ? 'timeline.typeMessage' : 'timeline.typeEvent'
+        ) || item.type)} · ${formatDate(item.date)}</div>
       </div>
       <div class="memory-actions">
-        <button type="button" data-action="delete-timeline-item" data-id="${item.id}" data-type="${item.type}" title="Supprimer">🗑️</button>
+        <button type="button" data-action="delete-timeline-item" data-id="${item.id}" data-type="${item.type}" title="${window.I18n?.t('gallery.delete') || 'Supprimer'}">🗑️</button>
       </div>
     `;
     list.appendChild(entry);
@@ -2612,7 +2653,7 @@ function initMessageProfilePhotos() {
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (e) => applyHeaderPhoto('primary', e.target.result);
-      reader.onerror = () => showToast('Impossible de lire cette image.');
+      reader.onerror = () => showToast(window.I18n?.t('profile.imageReadError') || 'Impossible de lire cette image.');
       reader.readAsDataURL(file);
       inputPrimary.value = '';
     });
@@ -2634,11 +2675,11 @@ function initMessageProfilePhotos() {
       const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
       const allowedExtensions = /\.(jpe?g|png|webp)$/i;
       if (!allowedTypes.includes(file.type.toLowerCase()) && !allowedExtensions.test(file.name)) {
-        showToast('Choisissez une image JPG, JPEG, PNG ou WEBP.');
+        showToast(window.I18n?.t('profile.imageFormatError') || 'Choisissez une image JPG, JPEG, PNG ou WEBP.');
         return;
       }
       if (file.size > 4 * 1024 * 1024) {
-        showToast('Cette image dépasse la limite de 4 Mo.');
+        showToast(window.I18n?.t('profile.imageTooLarge') || 'Cette image dépasse la limite de 4 Mo.');
         return;
       }
       if (previewPartnerAvatarUrl) URL.revokeObjectURL(previewPartnerAvatarUrl);
@@ -2665,9 +2706,9 @@ function initMessageProfilePhotos() {
       reader.onload = event => {
         applyHeaderPhoto('secondary', event.target.result);
         discardPreview();
-        showToast('Photo de profil mise à jour sur cet appareil.');
+        showToast(window.I18n?.t('profile.photoUpdated') || 'Photo de profil mise à jour sur cet appareil.');
       };
-      reader.onerror = () => showToast('Impossible de lire cette image.');
+      reader.onerror = () => showToast(window.I18n?.t('profile.imageReadError') || 'Impossible de lire cette image.');
       reader.readAsDataURL(pendingPartnerAvatarFile);
     });
   }
@@ -2694,7 +2735,7 @@ async function initMessages() {
     btn.addEventListener('click', async () => {
       const state = getPairingState();
       if (!state.linked) {
-        showToast('Vous devez d\'abord lier votre compte à votre partenaire.');
+        showToast(window.I18n?.t('profile.pairRequired') || 'Vous devez d\'abord lier votre compte à votre partenaire.');
         return;
       }
       if (composer?.value.trim()) {
@@ -2702,7 +2743,7 @@ async function initMessages() {
           await sendTextMessage(composer.value);
         } catch (error) {
           console.warn('Failed to send message', error);
-          showToast('Impossible d\'envoyer le message.');
+          showToast(window.I18n?.t('profile.sendFailed') || 'Impossible d\'envoyer le message.');
         }
       } else {
         composer?.focus();
@@ -2718,7 +2759,7 @@ async function initMessages() {
           await sendTextMessage(composer.value);
         } catch (error) {
           console.warn('Failed to send message', error);
-          showToast('Impossible d\'envoyer le message.');
+          showToast(window.I18n?.t('profile.sendFailed') || 'Impossible d\'envoyer le message.');
         }
       }
     });
@@ -2777,12 +2818,12 @@ async function initMessages() {
       try {
         if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(code);
-          showToast('Code d’invitation copié');
+          showToast(window.I18n?.t('profile.invitationCopied') || 'Code d’invitation copié');
         } else {
-          showToast('Code d’invitation prêt à partager');
+          showToast(window.I18n?.t('profile.invitationReady') || 'Code d’invitation prêt à partager');
         }
       } catch (error) {
-        showToast('Code d’invitation prêt à partager');
+        showToast(window.I18n?.t('profile.invitationReady') || 'Code d’invitation prêt à partager');
       }
       updateMessagesPairingUI();
     });
@@ -2807,19 +2848,19 @@ async function initMessages() {
 
       if (!code) {
         console.warn('⚠️  No code entered');
-        showToast('Saisissez un code valide.');
+        showToast(window.I18n?.t('profile.enterValidCode') || 'Saisissez un code valide.');
         return;
       }
 
       if (!validCodePattern.test(code)) {
         console.warn('⚠️  Invalid code format:', code);
-        showToast('Code invalide. Vérifiez le format.');
+        showToast(window.I18n?.t('profile.invalidCodeFormat') || 'Code invalide. Vérifiez le format.');
         return;
       }
 
       if (code === currentState.myCode.toUpperCase()) {
         console.warn('⚠️  User entered their own code');
-        showToast('Entrez le code fourni par votre partenaire.');
+        showToast(window.I18n?.t('profile.enterPartnerCode') || 'Entrez le code fourni par votre partenaire.');
         return;
       }
 
@@ -2834,7 +2875,7 @@ async function initMessages() {
         // Check if conversation exists (Partner A created it)
         if (!window.supabaseClient) {
           console.error('❌ Supabase client not available');
-          showToast('Erreur: Supabase indisponible');
+          showToast(window.I18n?.t('profile.backendUnavailable') || 'Erreur : Supabase indisponible');
           return;
         }
 
@@ -2847,13 +2888,13 @@ async function initMessages() {
 
         if (selectError) {
           console.error('❌ Supabase validation error:', selectError.message);
-          showToast('Erreur lors de la validation du code');
+          showToast(window.I18n?.t('profile.validationFailed') || 'Erreur lors de la validation du code');
           return;
         }
 
         if (!conversation) {
           console.error('❌ Conversation not found. Partner A must create their profile first');
-          showToast('Code invalide. Votre partenaire doit créer son profil en premier.');
+          showToast(window.I18n?.t('profile.partnerProfileRequired') || 'Code invalide. Votre partenaire doit créer son profil en premier.');
           return;
         }
 
@@ -2865,11 +2906,11 @@ async function initMessages() {
           await window.MessageModule.initialize();
         }
         
-        showToast('✅ Liaison établie avec votre partenaire!');
+        showToast(window.I18n?.t('profile.pairingEstablished') || '✅ Liaison établie avec votre partenaire !');
         partnerCodeInput.value = '';  // Clear input after success
       } catch (error) {
         console.error('❌ Linking error:', error);
-        showToast('Erreur lors de la liaison');
+        showToast(window.I18n?.t('profile.pairingFailed') || 'Erreur lors de la liaison');
       }
     });
   }
@@ -2908,7 +2949,7 @@ async function initMessages() {
 
   if (window.MessageModule && typeof window.MessageModule.onMessagesUpdated === 'function') {
     window.MessageModule.onMessagesUpdated(() => {
-      renderMessages();
+      renderMessages('', 'date_desc', true);
       renderTimeline();
       updateStats();
       updateMessageSettingsSummary();
@@ -2972,7 +3013,7 @@ function initBackup() {
       link.download = 'carnet-export.json';
       link.click();
       URL.revokeObjectURL(url);
-      showToast('Export JSON prêt à télécharger');
+      showToast(window.I18n?.t('profile.exportReady') || 'Export JSON prêt à télécharger');
     });
   }
 
@@ -3007,10 +3048,10 @@ function initBackup() {
         renderChallenge();
         renderGameHistory();
         updateStats();
-        showToast('Import JSON réussi');
+        showToast(window.I18n?.t('profile.importSuccess') || 'Import JSON réussi');
       } catch (error) {
         console.error('Erreur lors de l’import JSON', error);
-        showToast('Fichier JSON invalide');
+        showToast(window.I18n?.t('profile.invalidImport') || 'Fichier JSON invalide');
       } finally {
         importInput.value = '';
       }
@@ -3131,7 +3172,7 @@ function initOnboarding() {
     renderCoupleInfo(getSettings());
     populateSettingsForm(getSettings());
     modal.hidden = true;
-    showToast('Bienvenue ! Vos informations ont été enregistrées 💕');
+    showToast(window.I18n?.t('profile.welcomeSaved') || 'Bienvenue ! Vos informations ont été enregistrées 💕');
   });
 
   const stored = load(STORAGE_KEYS.settings, null);
@@ -3220,7 +3261,7 @@ function initDateModal() {
     saveSettings({ startDate: date });
     renderCoupleInfo(getSettings());
     modal.hidden = true;
-    showToast('Date de rencontre mise à jour 💕');
+    showToast(window.I18n?.t('profile.startDateUpdated') || 'Date de rencontre mise à jour 💕');
   });
 }
 
@@ -3257,10 +3298,10 @@ function initCouplePhoto() {
 
       save(STORAGE_KEYS.settings, updatedSettings);
       renderCoupleInfo(updatedSettings);
-      showToast(role === 'first' ? 'Photo du premier partenaire mise à jour 📷' : 'Photo du second partenaire mise à jour 📷');
+      showToast(window.I18n?.t(role === 'first' ? 'profile.firstPhotoUpdated' : 'profile.secondPhotoUpdated'));
     };
     reader.onerror = () => {
-      showToast('Impossible de lire cette image. Veuillez choisir un autre fichier.');
+      showToast(window.I18n?.t('profile.photoReadError') || 'Impossible de lire cette image. Veuillez choisir un autre fichier.');
     };
     reader.readAsDataURL(file);
   };
@@ -3946,7 +3987,7 @@ function initSettingsForm() {
     renderCoupleInfo(getSettings());
     populateSettingsForm(getSettings());
     modal.hidden = true;
-    showToast('Informations du couple mises à jour 💕');
+    showToast(window.I18n?.t('profile.coupleUpdated') || 'Informations du couple mises à jour 💕');
   });
 
   showNicknames.addEventListener('change', () => {
@@ -4004,8 +4045,8 @@ function renderMemories(filter = '') {
           <div class="memory-text">${escapeHtml(memory.text)}</div>
         </div>
         <div class="memory-actions">
-          <button data-action="edit" data-id="${memory.id}" title="Modifier">✏️</button>
-          <button data-action="delete" data-id="${memory.id}" title="Supprimer">🗑️</button>
+          <button data-action="edit" data-id="${memory.id}" title="${window.I18n?.t('memories.editAction') || 'Modifier'}">✏️</button>
+          <button data-action="delete" data-id="${memory.id}" title="${window.I18n?.t('gallery.delete') || 'Supprimer'}">🗑️</button>
         </div>
       `;
       list.appendChild(card);
@@ -4028,14 +4069,18 @@ function openMemoryModal(id = null) {
   if (id) {
     const memory = getMemories().find(m => m.id === id);
     if (!memory) return;
-    document.getElementById('memoryModalTitle').textContent = 'Modifier le souvenir';
+    const title = document.getElementById('memoryModalTitle');
+    title.dataset.i18n = 'memories.editTitle';
+    title.textContent = window.I18n?.t('memories.editTitle') || 'Modifier le souvenir';
     document.getElementById('memoryId').value = memory.id;
     document.getElementById('memoryTitle').value = memory.title;
     document.getElementById('memoryDate').value = memory.date;
     document.getElementById('memoryText').value = memory.text;
     document.getElementById('memoryMood').value = memory.mood;
   } else {
-    document.getElementById('memoryModalTitle').textContent = 'Nouveau souvenir';
+    const title = document.getElementById('memoryModalTitle');
+    title.dataset.i18n = 'memories.newTitle';
+    title.textContent = window.I18n?.t('memories.newTitle') || 'Nouveau souvenir';
     document.getElementById('memoryId').value = '';
     document.getElementById('memoryDate').value = new Date().toISOString().split('T')[0];
   }
@@ -4048,11 +4093,11 @@ function closeMemoryModal() {
 }
 
 function deleteMemory(id) {
-  if (!confirm('Supprimer ce souvenir ?')) return;
+  if (!confirm(window.I18n?.t('memories.deleteConfirm') || 'Supprimer ce souvenir ?')) return;
   const memories = getMemories().filter(m => m.id !== id);
   saveMemories(memories);
   renderMemories();
-  showToast('Souvenir supprimé');
+  showToast(window.I18n?.t('memories.deleted') || 'Souvenir supprimé');
 }
 
 function initMemories() {
@@ -4076,10 +4121,10 @@ function initMemories() {
     let memories = getMemories();
     if (id) {
       memories = memories.map(m => m.id === id ? memory : m);
-      showToast('Souvenir modifié ✏️');
+      showToast(window.I18n?.t('memories.updated') || 'Souvenir modifié ✏️');
     } else {
       memories.push(memory);
-      showToast('Souvenir ajouté 💕');
+      showToast(window.I18n?.t('memories.added') || 'Souvenir ajouté 💕');
     }
 
     saveMemories(memories);
@@ -4481,7 +4526,7 @@ function initGallery() {
         if (loaded === files.length) {
           saveGallery(photos);
           renderGallery();
-          showToast(`${files.length} photo${files.length > 1 ? 's' : ''} ajoutée${files.length > 1 ? 's' : ''} 🖼️`);
+          showToast(window.I18n?.t('gallery.photosAdded', { count: files.length }) || `${files.length} photo${files.length > 1 ? 's' : ''} ajoutée${files.length > 1 ? 's' : ''} 🖼️`);
         }
       };
       reader.readAsDataURL(file);
@@ -4738,7 +4783,7 @@ async function renderPlaylist() {
     const list = document.getElementById('playlistList');
 
     if (!tracks.length) {
-      list.innerHTML = '<div class="empty-state"><span class="empty-icon">🎵</span><p>Aucune musique pour l\'instant</p><p class="empty-sub">Ajoutez vos pistes préférées !</p></div>';
+      list.innerHTML = `<div class="empty-state"><span class="empty-icon">🎵</span><p>${window.I18n?.t('media.noTracks') || 'Aucune musique pour l\'instant'}</p><p class="empty-sub">${window.I18n?.t('media.addTrackHelp') || 'Ajoutez vos pistes préférées !'}</p></div>`;
       updatePlayerPlaybackState();
       return;
     }
@@ -4754,12 +4799,12 @@ async function renderPlaylist() {
           <span class="playlist-icon">🎶</span>
           <div>
             <div class="playlist-title">${escapeHtml(track.name)}</div>
-            <div class="playlist-meta">${escapeHtml(track.type || 'Fichier audio')}</div>
+            <div class="playlist-meta">${escapeHtml(track.type || window.I18n?.t('media.audioFile') || 'Fichier audio')}</div>
           </div>
         </div>
         <div class="playlist-actions">
-          <button class="btn-secondary btn-sm" data-play-index="${index}">Écouter</button>
-          <button class="playlist-delete-btn" type="button" data-delete-track-id="${track.id}" aria-label="Supprimer la musique">🗑️</button>
+          <button class="btn-secondary btn-sm" data-play-index="${index}">${window.I18n?.t('media.listen') || 'Écouter'}</button>
+          <button class="playlist-delete-btn" type="button" data-delete-track-id="${track.id}" aria-label="${window.I18n?.t('media.deleteTrack') || 'Supprimer la musique'}">🗑️</button>
         </div>
       `;
       list.appendChild(item);
@@ -4771,7 +4816,7 @@ async function renderPlaylist() {
 
     list.querySelectorAll('[data-delete-track-id]').forEach(btn => {
       btn.addEventListener('click', (event) => {
-        if (!confirm('Voulez-vous vraiment supprimer cette musique ?')) return;
+        if (!confirm(window.I18n?.t('media.confirmDeleteTrack') || 'Voulez-vous vraiment supprimer cette musique ?')) return;
         const trackId = event.currentTarget.dataset.deleteTrackId;
         const deleteItem = event.currentTarget.closest('.playlist-item');
         deleteItem?.classList.add('is-removing');
@@ -4798,7 +4843,7 @@ async function deleteTrack(id) {
     await deleteAudioRecord(id);
   } catch (error) {
     console.error('Erreur lors de la suppression de la musique :', error);
-    showToast('Impossible de supprimer cette piste.');
+    showToast(window.I18n?.t('media.deleteTrackError') || 'Impossible de supprimer cette piste.');
     return;
   }
 
@@ -4829,7 +4874,7 @@ async function deleteTrack(id) {
   }
 
   await renderPlaylist();
-  showToast('✅ Musique supprimée avec succès.');
+  showToast(`✅ ${window.I18n?.t('media.deleted') || 'Musique supprimée avec succès.'}`);
 }
 
 function updatePlayerUI() {
@@ -4842,8 +4887,8 @@ function updatePlayerUI() {
   updatePlayerPlaybackState();
 
   if (!track) {
-    titleEl.textContent = 'Aucune musique sélectionnée';
-    artistEl.textContent = 'Ajoutez une piste pour commencer';
+    titleEl.textContent = window.I18n?.t('media.emptyTrack') || 'Aucune musique sélectionnée';
+    artistEl.textContent = window.I18n?.t('media.addTrackHelp') || 'Ajoutez une piste pour commencer';
     playPauseBtn.textContent = '▶️';
     progressEl.value = 0;
     timeEl.textContent = '00:00 / 00:00';
@@ -4851,7 +4896,7 @@ function updatePlayerUI() {
   }
 
   titleEl.textContent = track.name;
-  artistEl.textContent = 'Lecture en cours';
+  artistEl.textContent = window.I18n?.t('media.playing') || 'Lecture en cours';
   playPauseBtn.textContent = currentAudio && !currentAudio.paused ? '⏸️' : '▶️';
   progressEl.value = 0;
   timeEl.textContent = '00:00 / 00:00';
@@ -4868,7 +4913,10 @@ function updatePlayerPlaybackState() {
   });
   const button = document.getElementById('playPauseBtn');
   button.textContent = isPlaying ? '⏸️' : '▶️';
-  button.setAttribute('aria-label', isPlaying ? 'Mettre la piste en pause' : 'Lire la piste');
+  const actionLabel = window.I18n?.t(isPlaying ? 'media.pauseTrack' : 'media.playTrack')
+    || (isPlaying ? 'Mettre la piste en pause' : 'Lire la piste');
+  button.setAttribute('aria-label', actionLabel);
+  button.title = actionLabel;
 }
 
 function updateVinylRotation(isPlaying) {
@@ -4949,7 +4997,7 @@ function getAudioPlayer() {
       const trackTime = document.getElementById('trackTime');
       trackTime.textContent = `00:00 / ${formatMediaTime(currentAudio.duration)}`;
       document.getElementById('playPauseBtn').textContent = '⏸️';
-      document.getElementById('trackArtist').textContent = 'Lecture en cours';
+      document.getElementById('trackArtist').textContent = window.I18n?.t('media.playing') || 'Lecture en cours';
     });
   }
   return currentAudio;
@@ -4967,7 +5015,7 @@ async function playTrack(index) {
   audio.load();
   updatePlayerUI();
   await audio.play().catch(() => {
-    showToast('Lecture impossible pour cette piste.');
+    showToast(window.I18n?.t('media.playbackError') || 'Lecture impossible pour cette piste.');
   });
 }
 
@@ -4980,7 +5028,7 @@ function playPauseTrack() {
 
   const audio = getAudioPlayer();
   if (audio.paused) {
-    audio.play().catch(() => showToast('Lecture impossible pour cette piste.'));
+    audio.play().catch(() => showToast(window.I18n?.t('media.playbackError') || 'Lecture impossible pour cette piste.'));
   } else {
     audio.pause();
   }
@@ -4993,7 +5041,7 @@ function playNextTrack(automatic = false) {
   if (automatic && preferences.repeat === 'one') {
     const audio = getAudioPlayer();
     audio.currentTime = 0;
-    audio.play().catch(() => showToast('Lecture impossible pour cette piste.'));
+    audio.play().catch(() => showToast(window.I18n?.t('media.playbackError') || 'Lecture impossible pour cette piste.'));
     return;
   }
   if (automatic && !preferences.autoNext) {
@@ -5042,7 +5090,13 @@ async function initMedia() {
       const files = Array.from(audioInput.files || []);
       if (!files.length) return;
 
-      const validFiles = files.filter(file => { if (!getSupportedAudioFile(file)) { showToast(`Format non pris en charge : ${file.name}`); return false; } return true; });
+      const validFiles = files.filter(file => {
+        if (!getSupportedAudioFile(file)) {
+          showToast(window.I18n?.t('media.unsupportedFormat', { name: file.name }) || `Format non pris en charge : ${file.name}`);
+          return false;
+        }
+        return true;
+      });
       if (!validFiles.length) return;
 
       try {
@@ -5051,10 +5105,12 @@ async function initMedia() {
           await saveAudioRecord(record);
         }
         await renderPlaylist();
-        showToast(`${validFiles.length} piste${validFiles.length > 1 ? 's' : ''} ajoutée${validFiles.length > 1 ? 's' : ''} 🎵`);
+        showToast(window.I18n?.t('media.trackAdded', {
+          count: window.I18n?.formatNumber(validFiles.length) || validFiles.length
+        }) || `${validFiles.length} piste${validFiles.length > 1 ? 's' : ''} ajoutée${validFiles.length > 1 ? 's' : ''} 🎵`);
       } catch (error) {
         console.error('Erreur lors de l’ajout de la musique :', error);
-        showToast('Impossible d’ajouter cette piste.');
+        showToast(window.I18n?.t('media.addTrackError') || 'Impossible d’ajouter cette piste.');
       } finally {
         audioInput.value = '';
       }
@@ -5085,12 +5141,12 @@ async function initMedia() {
   if (favTrackBtn) {
     favTrackBtn.addEventListener('click', () => {
       if (!playlistTracks.length) {
-        showToast('Ajoutez d’abord une piste musicale.');
+        showToast(window.I18n?.t('media.addTrackHelp') || 'Ajoutez d’abord une piste musicale.');
         return;
       }
       favTrackBtn.classList.toggle('is-favorite');
       favTrackBtn.textContent = favTrackBtn.classList.contains('is-favorite') ? '⭐' : '☆';
-      showToast(favTrackBtn.classList.contains('is-favorite') ? 'Piste ajoutée aux favoris ⭐' : 'Favori retiré');
+      showToast(window.I18n?.t(favTrackBtn.classList.contains('is-favorite') ? 'media.favoriteAdded' : 'media.favoriteRemoved'));
     });
   }
 
@@ -5132,7 +5188,7 @@ function hashDate(dateStr) {
 function renderChallenge() {
   const challenge = getDailyChallenge();
   document.getElementById('challengeIcon').textContent = challenge.icon;
-  document.getElementById('challengeText').textContent = challenge.text;
+  document.getElementById('challengeText').textContent = getLocalizedChallengeText(challenge.text);
   document.getElementById('challengeDate').textContent = formatDate(challenge.date);
 
   const doneEl = document.getElementById('challengeDone');
@@ -5151,6 +5207,13 @@ function renderChallenge() {
   renderChallengeHistory();
 }
 
+function getLocalizedChallengeText(text) {
+  const index = CHALLENGES.findIndex(challenge => challenge.text === text);
+  return index < 0
+    ? text
+    : window.I18n?.t(`challenge.${index + 1}`) || text;
+}
+
 function renderChallengeHistory() {
   const history = load(STORAGE_KEYS.challengeHistory, []);
   const list = document.getElementById('challengeHistory');
@@ -5160,7 +5223,7 @@ function renderChallengeHistory() {
     const li = document.createElement('li');
     li.innerHTML = `
       <span class="history-icon">${entry.icon}</span>
-      <span>${escapeHtml(entry.text)}</span>
+      <span>${escapeHtml(getLocalizedChallengeText(entry.text))}</span>
       <span class="history-date">${formatDate(entry.date)}</span>
     `;
     list.appendChild(li);
@@ -5169,15 +5232,16 @@ function renderChallengeHistory() {
 
 function newRandomChallenge() {
   const today = getTodayKey();
+  const currentChallengeText = getDailyChallenge().text;
   let index;
   do {
     index = Math.floor(Math.random() * CHALLENGES.length);
-  } while (CHALLENGES[index].text === document.getElementById('challengeText').textContent && CHALLENGES.length > 1);
+  } while (CHALLENGES[index].text === currentChallengeText && CHALLENGES.length > 1);
 
   const challenge = { ...CHALLENGES[index], date: today, completed: false };
   save(STORAGE_KEYS.challenge, challenge);
   renderChallenge();
-  showToast('Nouveau défi ! 💌');
+  showToast(window.I18n?.t('challenge.newToast') || 'Nouveau défi ! 💌');
 }
 
 function completeChallenge() {
@@ -5191,7 +5255,7 @@ function completeChallenge() {
   save(STORAGE_KEYS.challengeHistory, history);
 
   renderChallenge();
-  showToast('Bravo ! Défi accompli ✨');
+  showToast(window.I18n?.t('challenge.doneToast') || 'Bravo ! Défi accompli ✨');
 }
 
 function initChallenge() {
@@ -5214,7 +5278,7 @@ function initPWA() {
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
-      showToast('Carnet installé sur votre appareil ! 🎉');
+      showToast(window.I18n?.t('app.installed') || 'Carnet installé sur votre appareil ! 🎉');
     }
     deferredPrompt = null;
     document.getElementById('installBtn').hidden = true;
@@ -5302,7 +5366,7 @@ function escapeHtml(str) {
 
 function formatDate(dateStr) {
   const date = new Date(dateStr + 'T00:00:00');
-  return date.toLocaleDateString('fr-FR', {
+  return date.toLocaleDateString(window.I18n?.getLocale() || 'fr-FR', {
     day: 'numeric',
     month: 'long',
     year: 'numeric'
@@ -5317,6 +5381,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateCounter(getSettings().startDate);
     updateMessageHeader();
     updateMessagesPairingUI();
+    renderMessages();
+    renderChallenge();
+    renderDates();
+    renderGoals();
+    renderPlaces();
+    renderTimeline();
+    renderGallery();
+    updatePlayerUI();
+    renderPlaylist();
     const themeMode = getThemeModePreference();
     updateThemeControls(themeMode);
     updateThemeToggleButton(themeMode);

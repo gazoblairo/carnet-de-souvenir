@@ -12,7 +12,7 @@
   <script src="supabase.js"></script>
   <script src="js/realtime.js"></script>
   <script src="js/messages.js"></script>
-  <script src="js/i18n.js?v=20261126l"></script>
+  <script src="js/i18n.js?v=20261126n"></script>
   <script src="js/app-lock.js?v=20261126f"></script>
   <script src="js/notifications.js?v=20261126f"></script>
   <script src="js/visual-customizer.js?v=20261126b"></script>
@@ -68,7 +68,7 @@
           <span class="theme-icon-light">☀️</span>
           <span class="theme-icon-dark">🌙</span>
         </button>
-        <a href="#messages" class="nav-link nav-messages-link" data-section="messages" aria-label="Ouvrir Messages" title="Messages">
+        <a href="#messages" class="nav-link nav-messages-link" data-section="messages" aria-label="Ouvrir Messages" title="Messages" data-i18n-attr="aria-label,title" data-i18n-aria-label="nav.openMessages" data-i18n-title="nav.openMessagesTitle">
           <svg class="nav-messages-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.8-3.6A7.5 7.5 0 1 1 20 11.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M8.5 11.5h7M8.5 14.5h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
@@ -151,7 +151,7 @@
                 <button class="btn-secondary" id="completeChallengeBtn" data-i18n="home.completeChallenge">Marquer comme fait ✓</button>
               </div>
               <div class="challenge-done" id="challengeDone" hidden>
-                <span>✨ Défi accompli aujourd'hui !</span>
+                <span data-i18n="home.challengeDone">✨ Défi accompli aujourd'hui !</span>
               </div>
               <div class="challenge-history">
                 <h3 data-i18n="home.recentChallenges">Défis récents</h3>
@@ -161,10 +161,10 @@
           </div>
 
           <div class="feature-card">
-            <h3>Aperçu des prochains événements</h3>
+            <h3 data-i18n="home.upcomingTitle">Aperçu des prochains événements</h3>
             <div class="upcoming-events">
-              <div class="upcoming-event">📅 Aucun événement enregistré pour le moment.</div>
-              <div class="upcoming-event">💖 Ajoutez vos moments clés depuis la section souvenirs.</div>
+              <div class="upcoming-event" data-i18n="home.noUpcoming">📅 Aucun événement enregistré pour le moment.</div>
+              <div class="upcoming-event" data-i18n="home.addKeyMoments">💖 Ajoutez vos moments clés depuis la section souvenirs.</div>
             </div>
           </div>
         </div>
@@ -185,7 +185,7 @@
               </div>
             </dialog>
             <div class="messages-chat-identity" role="button" tabindex="0" aria-label="Ouvrir les paramètres de la conversation" data-i18n-attr="aria-label" data-i18n-aria-label="chat.settingsOpen" aria-haspopup="dialog" aria-controls="messagesSettingsPanel">
-              <h2 id="messagesPartnerName">Votre moitié</h2>
+              <h2 id="messagesPartnerName" data-i18n="chat.partnerFallback">Votre moitié</h2>
             </div>
             <details class="messages-settings-menu">
               <summary aria-label="Paramètres de la messagerie" title="Paramètres" data-i18n-attr="aria-label,title" data-i18n-aria-label="chat.settingsMenu" data-i18n-title="chat.settingsTitle"><span aria-hidden="true">⋮</span></summary>
@@ -467,7 +467,7 @@
               <button class="btn-primary" id="addMemoryBtn" data-i18n="memories.add">+ Ajouter</button>
             </div>
             <div class="search-bar">
-              <input type="search" id="memorySearch" placeholder="Rechercher un souvenir..." aria-label="Rechercher">
+              <input type="search" id="memorySearch" placeholder="Rechercher un souvenir…" aria-label="Rechercher des souvenirs" data-i18n-attr="placeholder,aria-label" data-i18n-placeholder="memories.searchPlaceholder" data-i18n-aria-label="memories.searchAria">
             </div>
             <div class="memories-list" id="memoriesList"></div>
             <div class="empty-state" id="memoriesEmpty" hidden>
@@ -486,8 +486,8 @@
               <div class="dates-grid" id="datesList"></div>
               <div class="empty-state" id="datesEmpty" hidden>
                 <span class="empty-icon">📅</span>
-                <p>Aucun événement enregistré</p>
-                <p class="empty-sub">Ajoutez vos moments clés.</p>
+                <p data-i18n="memories.datesEmpty">Aucun événement enregistré</p>
+                <p class="empty-sub" data-i18n="memories.datesEmptyHelp">Ajoutez vos moments clés.</p>
               </div>
             </section>
           </div>
@@ -503,17 +503,17 @@
 
           <div class="souvenirs-tools-heading">
             <span class="plus-category-icon" aria-hidden="true">✧</span>
-            <div><h2>Nos repères et accomplissements</h2><p>Projets, statistiques et lieux précieux de votre histoire.</p></div>
+            <div><h2 data-i18n="memories.landmarksTitle">Nos repères et accomplissements</h2><p data-i18n="memories.landmarksHelp">Projets, statistiques et lieux précieux de votre histoire.</p></div>
           </div>
 
           <div class="feature-card">
             <section id="bucket" class="content-panel">
               <div class="section-header">
-                <h2>Bucket List</h2>
-                <button class="btn-primary" id="addGoalBtn">+ Ajouter</button>
+                <h2 data-i18n="memories.bucketTitle">Bucket List</h2>
+                <button class="btn-primary" id="addGoalBtn" data-i18n="memories.addGoal">+ Ajouter</button>
               </div>
               <div class="goals-progress">
-                <div><strong id="goalsCompleted">0</strong> / <span id="goalsTotal">0</span> réalisés</div>
+                <div><strong id="goalsCompleted">0</strong> / <span id="goalsTotal">0</span> <span data-i18n="memories.completedLabel">réalisés</span></div>
                 <div class="progress-bar"><div id="goalsProgress"></div></div>
               </div>
               <div class="goals-list" id="goalsList"></div>
@@ -526,17 +526,17 @@
                 <h2 data-i18n="memories.stats">Statistiques</h2>
               </div>
               <div class="stats-grid">
-                <div class="stat-card"><span class="stat-number" id="statDays">0</span><span class="stat-label">Jours ensemble</span></div>
-                <div class="stat-card"><span class="stat-number" id="statMemoriesCount">0</span><span class="stat-label">Souvenirs</span></div>
-                <div class="stat-card"><span class="stat-number" id="statPhotoCount">0</span><span class="stat-label">Photos</span></div>
-                <div class="stat-card"><span class="stat-number" id="statMessagesCount">0</span><span class="stat-label">Messages</span></div>
-                <div class="stat-card"><span class="stat-number" id="statChallengesCount">0</span><span class="stat-label">Défis réalisés</span></div>
-                <div class="stat-card"><span class="stat-number" id="statGoalsCount">0</span><span class="stat-label">Objectifs réalisés</span></div>
-                <div class="stat-card"><span class="stat-number" id="statDatesCount">0</span><span class="stat-label">Événements</span></div>
+                <div class="stat-card"><span class="stat-number" id="statDays">0</span><span class="stat-label" data-i18n="stats.daysTogether">Jours ensemble</span></div>
+                <div class="stat-card"><span class="stat-number" id="statMemoriesCount">0</span><span class="stat-label" data-i18n="stats.memories">Souvenirs</span></div>
+                <div class="stat-card"><span class="stat-number" id="statPhotoCount">0</span><span class="stat-label" data-i18n="stats.photos">Photos</span></div>
+                <div class="stat-card"><span class="stat-number" id="statMessagesCount">0</span><span class="stat-label" data-i18n="stats.messages">Messages</span></div>
+                <div class="stat-card"><span class="stat-number" id="statChallengesCount">0</span><span class="stat-label" data-i18n="stats.challengesCompleted">Défis réalisés</span></div>
+                <div class="stat-card"><span class="stat-number" id="statGoalsCount">0</span><span class="stat-label" data-i18n="stats.goalsCompleted">Objectifs réalisés</span></div>
+                <div class="stat-card"><span class="stat-number" id="statDatesCount">0</span><span class="stat-label" data-i18n="stats.events">Événements</span></div>
               </div>
               <div class="charts-grid">
-                <div class="chart-card"><h3>Évolution</h3><canvas id="chartTimeline"></canvas></div>
-                <div class="chart-card"><h3>Répartition</h3><canvas id="chartBreakdown"></canvas></div>
+                <div class="chart-card"><h3 data-i18n="stats.evolution">Évolution</h3><canvas id="chartTimeline"></canvas></div>
+                <div class="chart-card"><h3 data-i18n="stats.breakdown">Répartition</h3><canvas id="chartBreakdown"></canvas></div>
               </div>
             </section>
           </div>
@@ -544,7 +544,7 @@
           <div class="feature-card">
             <section id="badges" class="content-panel">
               <div class="section-header">
-                <h2>Badges</h2>
+                <h2 data-i18n="stats.badges">Badges</h2>
               </div>
               <div class="badges-grid" id="badgesGrid"></div>
             </section>
@@ -553,8 +553,8 @@
           <div class="feature-card">
             <section id="map" class="content-panel">
               <div class="section-header">
-                <h2>Carte des souvenirs</h2>
-                <button class="btn-primary" id="addPlaceBtn">+ Ajouter un lieu</button>
+                <h2 data-i18n="stats.memoryMap">Carte des souvenirs</h2>
+                <button class="btn-primary" id="addPlaceBtn" data-i18n="stats.addPlace">+ Ajouter un lieu</button>
               </div>
               <div id="mapContainer"></div>
             </section>
@@ -750,7 +750,7 @@
                         <h2 id="specialMemoriesTitle" data-i18n="gallery.favoritesTitle">Nos souvenirs spéciaux</h2>
                         <p class="media-section-intro" data-i18n="gallery.favoritesHint">Gardez tout près les moments qui vous ressemblent.</p>
                       </div>
-                      <span class="favorite-photo-count" id="favoritePhotoCount">0 favori</span>
+                      <span class="favorite-photo-count" id="favoritePhotoCount" data-i18n="gallery.favoriteCountInitial">Favoris : 0</span>
                     </div>
                     <div class="gallery-grid special-gallery-grid" id="favoriteGalleryGrid"></div>
                     <div class="empty-state" id="favoriteGalleryEmpty">
@@ -782,15 +782,15 @@
                           <span class="track-spindle" aria-hidden="true"></span>
                         </span>
                         <div>
-                          <div id="trackTitle">Aucune musique sélectionnée</div>
-                          <div id="trackArtist">Ajoutez une piste pour commencer</div>
+                          <div id="trackTitle" data-i18n="media.emptyTrack">Aucune musique sélectionnée</div>
+                          <div id="trackArtist" data-i18n="media.addTrackHelp">Ajoutez une piste pour commencer</div>
                         </div>
                       </div>
                       <div class="player-controls">
-                        <button class="btn-secondary" id="prevTrackBtn" type="button" aria-label="Piste précédente" title="Piste précédente">⏮️</button>
-                        <button class="btn-secondary" id="playPauseBtn" type="button" aria-label="Lire la piste" title="Lire ou mettre en pause">▶️</button>
-                        <button class="btn-secondary" id="nextTrackBtn" type="button" aria-label="Piste suivante" title="Piste suivante">⏭️</button>
-                        <button class="btn-secondary" id="favTrackBtn" type="button" aria-label="Ajouter la piste aux favoris" title="Piste favorite">⭐</button>
+                        <button class="btn-secondary" id="prevTrackBtn" type="button" aria-label="Piste précédente" title="Piste précédente" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.previousTrack" data-i18n-title="media.previousTrack">⏮️</button>
+                        <button class="btn-secondary" id="playPauseBtn" type="button" aria-label="Lire la piste" title="Lire ou mettre en pause" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.playTrack" data-i18n-title="media.playTrack">▶️</button>
+                        <button class="btn-secondary" id="nextTrackBtn" type="button" aria-label="Piste suivante" title="Piste suivante" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.nextTrack" data-i18n-title="media.nextTrack">⏭️</button>
+                        <button class="btn-secondary" id="favTrackBtn" type="button" aria-label="Ajouter la piste aux favoris" title="Piste favorite" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.favoriteTrack" data-i18n-title="media.favoriteTrack">⭐</button>
                       </div>
                       <div class="music-visualizer" aria-hidden="true">
                         <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
@@ -825,16 +825,16 @@
               <div class="section-header game-header">
                 <div>
                   <h2 data-i18n="game.truthOrDare">Action ou Vérité</h2>
-                  <p class="game-subtitle">Mini-jeu romantique • premium • ultra fun</p>
+                  <p class="game-subtitle" data-i18n="game.subtitle">Mini-jeu romantique • premium • ultra fun</p>
                 </div>
-                <span class="game-badge">✨ Nouveau</span>
+                <span class="game-badge" data-i18n="game.new">✨ Nouveau</span>
               </div>
 
               <div class="game-intro">
-                <p>Choisissez une catégorie, faites tourner la roue et laissez le destin décider entre une action ou une vérité.</p>
+                <p data-i18n="game.intro">Choisissez une catégorie, faites tourner la roue et laissez le destin décider entre une action ou une vérité.</p>
               </div>
 
-              <div class="game-categories" role="group" aria-label="Catégories du jeu">
+              <div class="game-categories" role="group" aria-label="Catégories du jeu" data-i18n-attr="aria-label" data-i18n-aria-label="game.categoriesLabel">
                 <button class="category-btn active" data-category="romantique" data-i18n="game.romantic">🟢 Romantique</button>
                 <button class="category-btn" data-category="drole" data-i18n="game.funny">🟡 Drôle</button>
                 <button class="category-btn" data-category="audacieux" data-i18n="game.bold">🔴 Audacieux</button>
@@ -843,38 +843,38 @@
               <div class="game-wheel-card">
                 <div class="wheel-wrapper" id="wheelWrapper">
                   <div class="wheel-pointer"></div>
-                  <div class="wheel" id="gameWheel" role="img" aria-label="Roue Action ou Vérité, touchez la roue ou faites glisser pour jouer">
-                    <span class="wheel-segment-label" style="--segment-angle: 22.5deg">ACTION</span>
-                    <span class="wheel-segment-label" style="--segment-angle: 67.5deg">VÉRITÉ</span>
-                    <span class="wheel-segment-label" style="--segment-angle: 112.5deg">ACTION</span>
-                    <span class="wheel-segment-label" style="--segment-angle: 157.5deg">VÉRITÉ</span>
-                    <span class="wheel-segment-label" style="--segment-angle: 202.5deg">ACTION</span>
-                    <span class="wheel-segment-label" style="--segment-angle: 247.5deg">VÉRITÉ</span>
-                    <span class="wheel-segment-label" style="--segment-angle: 292.5deg">ACTION</span>
-                    <span class="wheel-segment-label" style="--segment-angle: 337.5deg">VÉRITÉ</span>
+                  <div class="wheel" id="gameWheel" role="img" aria-label="Roue Action ou Vérité, touchez la roue ou faites glisser pour jouer" data-i18n-attr="aria-label" data-i18n-aria-label="game.wheelLabel">
+                    <span class="wheel-segment-label" style="--segment-angle: 22.5deg" data-i18n="game.wheelAction">ACTION</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 67.5deg" data-i18n="game.wheelTruth">VÉRITÉ</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 112.5deg" data-i18n="game.wheelAction">ACTION</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 157.5deg" data-i18n="game.wheelTruth">VÉRITÉ</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 202.5deg" data-i18n="game.wheelAction">ACTION</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 247.5deg" data-i18n="game.wheelTruth">VÉRITÉ</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 292.5deg" data-i18n="game.wheelAction">ACTION</span>
+                    <span class="wheel-segment-label" style="--segment-angle: 337.5deg" data-i18n="game.wheelTruth">VÉRITÉ</span>
                   </div>
                   <div class="wheel-center" aria-hidden="true">💖</div>
                 </div>
 
                 <div class="game-controls">
                   <button class="game-spin-btn" id="spinGameBtn" data-i18n="game.spin">❤️ FAIRE TOURNER</button>
-                  <p class="game-status" id="gameStatus">Catégorie sélectionnée : <span id="selectedCategoryLabel">🟢 Romantique</span></p>
+                  <p class="game-status" id="gameStatus"><span data-i18n="game.statusSelected">Catégorie sélectionnée :</span> <span id="selectedCategoryLabel" data-i18n="game.romantic">🟢 Romantique</span></p>
                 </div>
               </div>
 
               <dialog class="game-result-dialog" id="gameResultDialog" aria-labelledby="gameResultTitle">
                 <div class="game-result-card" id="gameResultCard" hidden>
-                  <button class="game-result-close" id="gameResultClose" type="button" aria-label="Fermer le résultat">×</button>
-                  <div class="game-result-badge" id="gameResultBadge">❤️ Action</div>
-                  <h3 id="gameResultTitle">Votre défi</h3>
+                  <button class="game-result-close" id="gameResultClose" type="button" aria-label="Fermer le résultat" data-i18n-attr="aria-label" data-i18n-aria-label="game.closeResult">×</button>
+                  <div class="game-result-badge" id="gameResultBadge" data-i18n="game.action">❤️ Action</div>
+                  <h3 id="gameResultTitle" data-i18n="game.resultTitle">Votre défi</h3>
                   <p class="game-result-love" id="gameResultLove"></p>
-                  <p id="gameResultText">Choisissez une catégorie et lancez la roue.</p>
+                  <p id="gameResultText" data-i18n="game.resultStart">Choisissez une catégorie et lancez la roue.</p>
                   <div class="game-result-meta">
                     <span id="gameResultCategory">🟢 Romantique</span>
                   </div>
                   <div class="game-result-actions">
-                    <button class="btn-secondary" id="gameResultCloseAction" type="button">Fermer</button>
-                    <button class="btn-primary" id="gameResultReplay" type="button">❤️ Rejouer</button>
+                    <button class="btn-secondary" id="gameResultCloseAction" type="button" data-i18n="modal.close">Fermer</button>
+                    <button class="btn-primary" id="gameResultReplay" type="button" data-i18n="game.replay">❤️ Rejouer</button>
                   </div>
                 </div>
               </dialog>
@@ -889,7 +889,7 @@
           <header class="plus-hero">
             <span class="plus-hero-icon" aria-hidden="true">✦</span>
             <div>
-              <p class="plus-eyebrow">NOTRE PETIT UNIVERS</p>
+              <p class="plus-eyebrow" data-i18n="settingsHub.eyebrow">NOTRE PETIT UNIVERS</p>
               <h1 data-i18n="settingsHub.title">Paramètres</h1>
               <p data-i18n="settingsHub.help">Choisissez une catégorie pour gérer votre carnet.</p>
             </div>
@@ -1326,7 +1326,7 @@
           </section>
 
         </div>
-        <footer class="plus-footer">Notre Carnet <span aria-label="cœur">❤️</span> — Chaque souvenir compte.</footer>
+        <footer class="plus-footer">Notre Carnet <span aria-label="cœur">❤️</span> <span data-i18n="footer.tagline">— Chaque souvenir compte.</span></footer>
       </section>
     </main>
 
@@ -1346,32 +1346,32 @@
     <div class="modal-overlay" id="memoryModal" hidden>
       <div class="modal" role="dialog" aria-labelledby="memoryModalTitle">
         <div class="modal-header">
-          <h3 id="memoryModalTitle">Nouveau souvenir</h3>
-          <button class="btn-close" id="closeMemoryModal" aria-label="Fermer">&times;</button>
+          <h3 id="memoryModalTitle" data-i18n="memories.newTitle">Nouveau souvenir</h3>
+          <button class="btn-close" id="closeMemoryModal" aria-label="Fermer" data-i18n-attr="aria-label" data-i18n-aria-label="modal.close">&times;</button>
         </div>
         <form id="memoryForm">
           <input type="hidden" id="memoryId">
           <div class="form-group">
-            <label for="memoryTitle">Titre</label>
-            <input type="text" id="memoryTitle" required placeholder="Notre premier voyage...">
+            <label for="memoryTitle" data-i18n="memories.titleLabel">Titre</label>
+            <input type="text" id="memoryTitle" required placeholder="Notre premier voyage…" data-i18n-attr="placeholder" data-i18n-placeholder="memories.titlePlaceholder">
           </div>
           <div class="form-group">
-            <label for="memoryDate">Date</label>
+            <label for="memoryDate" data-i18n="memories.dateLabel">Date</label>
             <input type="date" id="memoryDate" required>
           </div>
           <div class="form-group">
-            <label for="memoryText">Description</label>
-            <textarea id="memoryText" rows="4" placeholder="Racontez ce moment spécial..."></textarea>
+            <label for="memoryText" data-i18n="memories.descriptionLabel">Description</label>
+            <textarea id="memoryText" rows="4" placeholder="Racontez ce moment spécial…" data-i18n-attr="placeholder" data-i18n-placeholder="memories.descriptionPlaceholder"></textarea>
           </div>
           <div class="form-group">
-            <label for="memoryMood">Humeur</label>
+            <label for="memoryMood" data-i18n="memories.moodLabel">Humeur</label>
             <select id="memoryMood">
-              <option value="💕">💕 Amour</option>
-              <option value="😊">😊 Joie</option>
-              <option value="🥰">🥰 Tendresse</option>
-              <option value="🎉">🎉 Célébration</option>
-              <option value="🌹">🌹 Romance</option>
-              <option value="✨">✨ Magie</option>
+              <option value="💕" data-i18n="memories.moodLove">💕 Amour</option>
+              <option value="😊" data-i18n="memories.moodJoy">😊 Joie</option>
+              <option value="🥰" data-i18n="memories.moodTenderness">🥰 Tendresse</option>
+              <option value="🎉" data-i18n="memories.moodCelebration">🎉 Célébration</option>
+              <option value="🌹" data-i18n="memories.moodRomance">🌹 Romance</option>
+              <option value="✨" data-i18n="memories.moodMagic">✨ Magie</option>
             </select>
           </div>
           <div class="modal-actions">
@@ -1386,12 +1386,12 @@
     <div class="modal-overlay" id="dateModal" hidden>
       <div class="modal" role="dialog" aria-labelledby="dateModalTitle">
         <div class="modal-header">
-          <h3 id="dateModalTitle">Date de rencontre</h3>
-          <button class="btn-close" id="closeDateModal" aria-label="Fermer">&times;</button>
+          <h3 id="dateModalTitle" data-i18n="date.modalTitle">Date de rencontre</h3>
+          <button class="btn-close" id="closeDateModal" aria-label="Fermer" data-i18n-attr="aria-label" data-i18n-aria-label="modal.close">&times;</button>
         </div>
         <form id="dateForm">
           <div class="form-group">
-            <label for="startDate">Quand vous êtes-vous rencontrés ?</label>
+            <label for="startDate" data-i18n="date.question">Quand vous êtes-vous rencontrés ?</label>
             <input type="date" id="startDate" required>
           </div>
           <div class="modal-actions">
@@ -1406,25 +1406,25 @@
     <div class="modal-overlay" id="profileModal" hidden>
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle">
         <div class="modal-header">
-          <h3 id="profileModalTitle">Modifier notre profil</h3>
-          <button class="btn-close" id="closeProfileModal" type="button" aria-label="Fermer">&times;</button>
+          <h3 id="profileModalTitle" data-i18n="profile.modalTitle">Modifier notre profil</h3>
+          <button class="btn-close" id="closeProfileModal" type="button" aria-label="Fermer" data-i18n-attr="aria-label" data-i18n-aria-label="modal.close">&times;</button>
         </div>
         <form id="profileForm">
           <div class="form-group">
-            <label for="firstName1">Mon prénom</label>
-            <input type="text" id="firstName1" required placeholder="Votre prénom">
+            <label for="firstName1" data-i18n="profile.firstName">Mon prénom</label>
+            <input type="text" id="firstName1" required placeholder="Votre prénom" data-i18n-attr="placeholder" data-i18n-placeholder="profile.firstNamePlaceholder">
           </div>
           <div class="form-group">
-            <label for="nickname1">Mon surnom</label>
-            <input type="text" id="nickname1" placeholder="Surnom">
+            <label for="nickname1" data-i18n="profile.nickname">Mon surnom</label>
+            <input type="text" id="nickname1" placeholder="Surnom" data-i18n-attr="placeholder" data-i18n-placeholder="profile.nicknamePlaceholder">
           </div>
           <div class="form-group">
-            <label for="firstName2">Prénom du partenaire</label>
-            <input type="text" id="firstName2" required placeholder="Prénom du partenaire">
+            <label for="firstName2" data-i18n="profile.partnerName">Prénom du partenaire</label>
+            <input type="text" id="firstName2" required placeholder="Prénom du partenaire" data-i18n-attr="placeholder" data-i18n-placeholder="profile.partnerNamePlaceholder">
           </div>
           <div class="form-group">
-            <label for="nickname2">Son surnom</label>
-            <input type="text" id="nickname2" placeholder="Surnom du partenaire">
+            <label for="nickname2" data-i18n="profile.partnerNickname">Son surnom</label>
+            <input type="text" id="nickname2" placeholder="Surnom du partenaire" data-i18n-attr="placeholder" data-i18n-placeholder="profile.partnerNicknamePlaceholder">
           </div>
           <div class="modal-actions">
             <button type="button" class="btn-secondary" id="cancelProfileBtn" data-i18n="modal.cancel">Annuler</button>
@@ -1438,41 +1438,41 @@
     <div class="modal-overlay" id="onboardingModal" hidden>
       <div class="modal large onboarding-modal" role="dialog" aria-labelledby="onboardingTitle">
         <div class="modal-header">
-          <h3 id="onboardingTitle">Bienvenue dans Notre Carnet</h3>
+          <h3 id="onboardingTitle" data-i18n="onboarding.title">Bienvenue dans Notre Carnet</h3>
         </div>
         <div class="modal-body">
-          <p class="modal-intro">Pour commencer, indiquez les informations de votre couple.</p>
+          <p class="modal-intro" data-i18n="onboarding.intro">Pour commencer, indiquez les informations de votre couple.</p>
           <form id="onboardingForm" class="onboarding-form">
             <div class="form-group">
-              <label for="onboardFirstName1">Mon prénom</label>
-              <input type="text" id="onboardFirstName1" required placeholder="Votre prénom">
+              <label for="onboardFirstName1" data-i18n="onboarding.firstName">Mon prénom</label>
+              <input type="text" id="onboardFirstName1" required placeholder="Votre prénom" data-i18n-attr="placeholder" data-i18n-placeholder="profile.firstNamePlaceholder">
             </div>
             <div class="form-group">
-              <label for="onboardFirstName2">Le prénom du partenaire</label>
-              <input type="text" id="onboardFirstName2" required placeholder="Prénom du partenaire">
+              <label for="onboardFirstName2" data-i18n="onboarding.partnerName">Le prénom du partenaire</label>
+              <input type="text" id="onboardFirstName2" required placeholder="Prénom du partenaire" data-i18n-attr="placeholder" data-i18n-placeholder="profile.partnerNamePlaceholder">
             </div>
             <div class="form-group">
-              <label for="onboardNickname1">Mon surnom (optionnel)</label>
-              <input type="text" id="onboardNickname1" placeholder="Surnom">
+              <label for="onboardNickname1" data-i18n="onboarding.nickname">Mon surnom (optionnel)</label>
+              <input type="text" id="onboardNickname1" placeholder="Surnom" data-i18n-attr="placeholder" data-i18n-placeholder="profile.nicknamePlaceholder">
             </div>
             <div class="form-group">
-              <label for="onboardNickname2">Le surnom du partenaire (optionnel)</label>
-              <input type="text" id="onboardNickname2" placeholder="Surnom du partenaire">
+              <label for="onboardNickname2" data-i18n="onboarding.partnerNickname">Le surnom du partenaire (optionnel)</label>
+              <input type="text" id="onboardNickname2" placeholder="Surnom du partenaire" data-i18n-attr="placeholder" data-i18n-placeholder="profile.partnerNicknamePlaceholder">
             </div>
             <div class="form-group">
-              <label for="onboardStartDate">Date de début de la relation</label>
+              <label for="onboardStartDate" data-i18n="onboarding.startDate">Date de début de la relation</label>
               <input type="date" id="onboardStartDate" required>
             </div>
             <div class="form-group avatar-group">
-              <label>Photo du couple</label>
+              <label data-i18n="onboarding.photo">Photo du couple</label>
               <div class="avatar-preview" id="onboardingPhotoPreview">
-                <img src="assets/images/couple.svg" alt="Photo du couple">
-                <button type="button" class="btn-secondary btn-sm" id="onboardingPhotoBtn">Choisir une photo</button>
+                <img src="assets/images/couple.svg" alt="Photo du couple" data-i18n-attr="alt" data-i18n-alt="onboarding.photoAlt">
+                <button type="button" class="btn-secondary btn-sm" id="onboardingPhotoBtn" data-i18n="onboarding.choosePhoto">Choisir une photo</button>
               </div>
               <input type="file" id="onboardingPhotoInput" accept="image/*" hidden>
             </div>
             <div class="modal-actions">
-              <button type="submit" class="btn-primary">Démarrer</button>
+              <button type="submit" class="btn-primary" data-i18n="onboarding.start">Démarrer</button>
             </div>
           </form>
         </div>
@@ -1520,7 +1520,7 @@
 
     <!-- Offline banner -->
     <div class="offline-banner" id="offlineBanner" hidden>
-      📡 Mode hors ligne — Vos données sont sauvegardées localement
+      <span data-i18n="offline.banner">📡 Mode hors ligne — Vos données sont sauvegardées localement</span>
     </div>
   </div>
 
@@ -1544,6 +1544,6 @@
     </div>
   </section>
 
-  <script src="js/script.js?v=20261126n"></script>
+  <script src="js/script.js?v=20261126p"></script>
 </body>
 </html>
