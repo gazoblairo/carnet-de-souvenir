@@ -1,10 +1,14 @@
-const CACHE_NAME = 'carnet-v55';
+const CACHE_NAME = 'carnet-v74';
 const ASSETS = [
   '/',
   '/index.html',
-  '/css/style.css?v=20261126h',
-  '/js/i18n.js?v=20261126e',
-  '/js/script.js?v=20261126i',
+  '/css/style.css?v=20261126o',
+  '/js/i18n.js?v=20261126l',
+  '/js/script.js?v=20261126n',
+  '/js/app-lock.js?v=20261126f',
+  '/js/notifications.js?v=20261126f',
+  '/js/visual-customizer.js?v=20261126b',
+  '/js/storage-manager.js?v=20261126a',
   '/supabase.js',
   '/js/realtime.js',
   '/js/messages.js',
@@ -53,5 +57,19 @@ self.addEventListener('fetch', (event) => {
 
         return cached || fetchPromise;
       })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const appClient = clients.find((client) => new URL(client.url).origin === self.location.origin);
+      if (appClient) {
+        return appClient.navigate(targetUrl).then((navigatedClient) => (navigatedClient || appClient).focus());
+      }
+      return self.clients.openWindow(targetUrl);
+    })
   );
 });

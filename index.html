@@ -12,8 +12,19 @@
   <script src="supabase.js"></script>
   <script src="js/realtime.js"></script>
   <script src="js/messages.js"></script>
-  <script src="js/i18n.js?v=20261126e"></script>
+  <script src="js/i18n.js?v=20261126l"></script>
+  <script src="js/app-lock.js?v=20261126f"></script>
+  <script src="js/notifications.js?v=20261126f"></script>
+  <script src="js/visual-customizer.js?v=20261126b"></script>
+  <script src="js/storage-manager.js?v=20261126a"></script>
   <script>
+    try {
+      const lockSettings = JSON.parse(localStorage.getItem('carnet_app_lock') || 'null');
+      if (lockSettings?.enabled) document.documentElement.dataset.appLockBoot = 'locked';
+    } catch (error) {
+      document.documentElement.dataset.appLockBoot = 'locked';
+      console.error('App lock startup check failed.', error);
+    }
     try {
       const rawSettings = localStorage.getItem('carnet_settings');
       const parsed = rawSettings ? JSON.parse(rawSettings) : null;
@@ -31,7 +42,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
   <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=20261126h">
+  <link rel="stylesheet" href="css/style.css?v=20261126o">
 </head>
 <body>
   <div id="app">
@@ -235,10 +246,96 @@
 
                     <section class="messages-settings-view" role="tabpanel" id="settingsPanelNotifications" aria-labelledby="settingsTabNotifications" data-settings-panel="notifications" hidden>
                       <h4 data-i18n="chat.notifications">Notifications</h4>
-                      <p class="messages-settings-note" data-i18n="chat.notificationsNote">Les notifications de conversation ne sont pas configurées dans cette version.</p>
-                      <div class="messages-setting-row"><span data-i18n="chat.newMessageNotifications">Notifications de nouveaux messages</span><input type="checkbox" disabled aria-label="Notifications non disponibles" data-i18n-attr="aria-label" data-i18n-aria-label="chat.notAvailable"></div>
-                      <div class="messages-setting-row"><span data-i18n="chat.notificationSounds">Sons de notification</span><input type="checkbox" disabled aria-label="Notifications non disponibles" data-i18n-attr="aria-label" data-i18n-aria-label="chat.notAvailable"></div>
-                      <div class="messages-setting-row"><span data-i18n="chat.newMessageAlerts">Alertes de nouveaux messages</span><input type="checkbox" disabled aria-label="Notifications non disponibles" data-i18n-attr="aria-label" data-i18n-aria-label="chat.notAvailable"></div>
+                      <p class="messages-settings-note" data-i18n="notification.scopeNote">Les alertes de nouveaux messages fonctionnent lorsque l’application est ouverte. Les notifications lorsque l’application est fermée nécessitent un service Push.</p>
+                      <section class="notification-settings-card" aria-labelledby="notificationGeneralTitle">
+                        <h5 id="notificationGeneralTitle" data-i18n="notification.generalTitle">Réglages généraux</h5>
+                        <label class="notification-setting-row notification-setting-row--master" for="notificationAllEnabled">
+                          <span><strong data-i18n="notification.master">Toutes les notifications</strong><small data-i18n="notification.masterHelp">Mettre en pause ou reprendre les alertes activées ci-dessous.</small></span>
+                          <input id="notificationAllEnabled" type="checkbox" data-notification-setting="enabled">
+                        </label>
+                        <div class="notification-permission">
+                          <div><strong data-i18n="notification.permissionTitle">Notifications système</strong><p id="notificationPermissionStatus" role="status" aria-live="polite"></p></div>
+                          <button class="messages-settings-secondary" id="notificationPermissionButton" type="button" data-i18n="notification.enablePermission">Autoriser dans le navigateur</button>
+                        </div>
+                      </section>
+
+                      <section class="notification-settings-card" aria-labelledby="notificationTypesTitle">
+                        <h5 id="notificationTypesTitle" data-i18n="notification.typesTitle">Types de notifications</h5>
+                        <label class="notification-setting-row" for="notificationMessages">
+                          <span data-i18n="notification.messages">Nouveaux messages</span><input id="notificationMessages" type="checkbox" data-notification-type="messages">
+                        </label>
+                        <div class="notification-setting-row is-unavailable">
+                          <span><span data-i18n="notification.voice">Messages vocaux</span><small data-i18n="notification.voiceUnavailable">Aucun événement de message vocal reçu n’est actuellement disponible.</small></span>
+                          <input id="notificationVoice" type="checkbox" disabled aria-label="Indisponible" data-i18n-attr="aria-label" data-i18n-aria-label="notification.unavailable">
+                        </div>
+                        <div class="notification-setting-row is-unavailable">
+                          <span><span data-i18n="notification.media">Photos et médias partagés</span><small data-i18n="notification.mediaUnavailable">Les médias restent locaux; aucun événement de partage reçu n’est disponible.</small></span>
+                          <input id="notificationMedia" type="checkbox" disabled aria-label="Indisponible" data-i18n-attr="aria-label" data-i18n-aria-label="notification.unavailable">
+                        </div>
+                        <div class="notification-setting-row is-unavailable">
+                          <span><span data-i18n="notification.calls">Appels entrants</span><small data-i18n="notification.callsUnavailable">Aucune fonction d’appel n’est disponible dans l’application.</small></span>
+                          <input type="checkbox" disabled aria-label="Indisponible" data-i18n-attr="aria-label" data-i18n-aria-label="notification.unavailable">
+                        </div>
+                        <div class="notification-setting-row is-unavailable">
+                          <span><span data-i18n="notification.memories">Nouveaux souvenirs</span><small data-i18n="notification.memoriesUnavailable">Les souvenirs ne sont pas synchronisés entre les partenaires.</small></span>
+                          <input type="checkbox" disabled aria-label="Indisponible" data-i18n-attr="aria-label" data-i18n-aria-label="notification.unavailable">
+                        </div>
+                        <div class="notification-setting-row is-unavailable">
+                          <span><span data-i18n="notification.activities">Activités et interactions</span><small data-i18n="notification.activitiesUnavailable">Aucun flux d’activités du partenaire n’est disponible.</small></span>
+                          <input type="checkbox" disabled aria-label="Indisponible" data-i18n-attr="aria-label" data-i18n-aria-label="notification.unavailable">
+                        </div>
+                      </section>
+
+                      <section class="notification-settings-card" aria-labelledby="notificationSoundTitle">
+                        <h5 id="notificationSoundTitle" data-i18n="notification.soundTitle">Sons et vibrations</h5>
+                        <label class="notification-setting-row" for="notificationSoundEnabled">
+                          <span data-i18n="notification.soundEnable">Son des alertes</span><input id="notificationSoundEnabled" type="checkbox" data-notification-setting="soundEnabled">
+                        </label>
+                        <label class="notification-field" for="notificationSound">
+                          <span data-i18n="notification.soundChoice">Son</span>
+                          <select id="notificationSound" data-notification-setting="sound">
+                            <option value="soft" data-i18n="notification.soundSoft">Doux</option>
+                            <option value="bell" data-i18n="notification.soundBell">Clochette</option>
+                            <option value="bright" data-i18n="notification.soundBright">Cristallin</option>
+                            <option value="custom" data-i18n="notification.soundCustom">Fichier personnalisé</option>
+                          </select>
+                        </label>
+                        <div class="notification-sound-actions">
+                          <input id="notificationSoundFile" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a" hidden>
+                          <button class="messages-settings-secondary" id="notificationChooseSound" type="button" data-i18n="notification.chooseFile">Choisir un fichier audio</button>
+                          <button class="messages-settings-secondary" id="notificationRemoveSound" type="button" hidden data-i18n="notification.removeCustom">Retirer le son personnalisé</button>
+                          <span id="notificationSoundFileName" class="notification-file-name"></span>
+                          <button class="messages-settings-secondary" id="notificationTestSound" type="button" data-i18n="notification.testSound">Tester le son</button>
+                        </div>
+                        <label class="notification-setting-row" for="notificationVibration">
+                          <span><span data-i18n="notification.vibration">Vibrer à la réception</span><small id="notificationVibrationHelp" data-i18n="notification.vibrationUnsupported">Vibration non prise en charge par cet appareil ou navigateur.</small></span>
+                          <input id="notificationVibration" type="checkbox" data-notification-setting="vibration">
+                        </label>
+                      </section>
+
+                      <section class="notification-settings-card" aria-labelledby="notificationDndTitle">
+                        <h5 id="notificationDndTitle" data-i18n="notification.dndTitle">Ne pas déranger</h5>
+                        <label class="notification-setting-row" for="notificationDndEnabled">
+                          <span><span data-i18n="notification.dndEnable">Suspendre les sons pendant une plage horaire</span><small data-i18n="notification.dndHelp">Les notifications restent visibles, mais leur son est coupé.</small></span>
+                          <input id="notificationDndEnabled" type="checkbox" data-notification-setting="dndEnabled">
+                        </label>
+                        <div class="notification-time-range">
+                          <label class="notification-field" for="notificationDndStart"><span data-i18n="notification.dndStart">Début</span><input id="notificationDndStart" type="time" data-notification-setting="dndStart"></label>
+                          <label class="notification-field" for="notificationDndEnd"><span data-i18n="notification.dndEnd">Fin</span><input id="notificationDndEnd" type="time" data-notification-setting="dndEnd"></label>
+                        </div>
+                        <fieldset class="notification-exceptions">
+                          <legend data-i18n="notification.dndExceptions">Exceptions autorisées</legend>
+                          <label for="notificationExceptionMessages"><span data-i18n="notification.messages">Nouveaux messages</span><input id="notificationExceptionMessages" type="checkbox" data-notification-exception="messages"></label>
+                        </fieldset>
+                      </section>
+
+                      <section class="notification-settings-card" aria-labelledby="notificationPrivacyTitle">
+                        <h5 id="notificationPrivacyTitle" data-i18n="notification.privacyTitle">Confidentialité</h5>
+                        <label class="notification-setting-row" for="notificationHideContent">
+                          <span><span data-i18n="notification.hideContent">Masquer le contenu des messages</span><small data-i18n="notification.hideContentHelp">Affiche le nom du partenaire et un texte générique dans les alertes.</small></span>
+                          <input id="notificationHideContent" type="checkbox" data-notification-setting="hideContent">
+                        </label>
+                      </section>
                     </section>
 
                     <section class="messages-settings-view" role="tabpanel" id="settingsPanelPrivacy" aria-labelledby="settingsTabPrivacy" data-settings-panel="privacy" hidden>
@@ -793,36 +890,59 @@
             <span class="plus-hero-icon" aria-hidden="true">✦</span>
             <div>
               <p class="plus-eyebrow">NOTRE PETIT UNIVERS</p>
-              <h1>Plus</h1>
-              <p>Personnalisons notre petit univers</p>
+              <h1 data-i18n="settingsHub.title">Paramètres</h1>
+              <p data-i18n="settingsHub.help">Choisissez une catégorie pour gérer votre carnet.</p>
             </div>
             <span class="plus-hero-heart" aria-hidden="true">♡</span>
           </header>
 
-          <div class="plus-category-heading">
-            <span class="plus-category-icon" aria-hidden="true">✨</span>
-            <div><h2 data-i18n="settings.preferences">Préférences de l’application</h2><p data-i18n="settings.preferencesHelp">Choisissez l’apparence de votre carnet.</p></div>
-          </div>
+          <nav class="settings-category-hub" id="settingsCategoryHub" aria-label="Catégories des paramètres" data-i18n-attr="aria-label" data-i18n-aria-label="settingsHub.categoryList">
+            <div class="settings-category-grid">
+              <button class="settings-category-card" type="button" data-settings-open-category="appearance" aria-controls="settingsPageAppearance">
+                <span class="settings-category-icon" aria-hidden="true">🎨</span>
+                <span class="settings-category-copy"><strong data-i18n="settingsHub.appearance">Apparence et personnalisation</strong><small data-i18n="settingsHub.appearanceHelp">Thème, couleurs, taille du texte et style de chaque espace.</small></span>
+                <span class="settings-category-indicator" data-settings-indicator="appearance" hidden></span><span class="settings-category-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="settings-category-card" type="button" data-settings-open-category="notifications" aria-controls="settingsPageNotifications">
+                <span class="settings-category-icon" aria-hidden="true">🔔</span>
+                <span class="settings-category-copy"><strong data-i18n="settingsHub.notifications">Notifications</strong><small data-i18n="settingsHub.notificationsHelp">Alertes, sons, vibrations, plage silencieuse et confidentialité.</small></span>
+                <span class="settings-category-indicator" data-settings-indicator="notifications" hidden></span><span class="settings-category-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="settings-category-card" type="button" data-settings-open-category="privacy" aria-controls="settingsPagePrivacy">
+                <span class="settings-category-icon" aria-hidden="true">🔐</span>
+                <span class="settings-category-copy"><strong data-i18n="settingsHub.privacy">Confidentialité et sécurité</strong><small data-i18n="settingsHub.privacyHelp">Verrouillage de l’application et protection de votre accès.</small></span>
+                <span class="settings-category-indicator" data-settings-indicator="privacy" hidden></span><span class="settings-category-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="settings-category-card" type="button" data-settings-open-category="storage" aria-controls="settingsPageStorage">
+                <span class="settings-category-icon" aria-hidden="true">💾</span>
+                <span class="settings-category-copy"><strong data-i18n="settingsHub.storage">Stockage</strong><small data-i18n="settingsHub.storageHelp">Espace local, fichiers, doublons et cache de l’application.</small></span>
+                <span class="settings-category-indicator" data-settings-indicator="storage" hidden></span><span class="settings-category-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="settings-category-card" type="button" data-settings-open-category="accessibility" aria-controls="settingsPageAccessibility">
+                <span class="settings-category-icon" aria-hidden="true">🌍</span>
+                <span class="settings-category-copy"><strong data-i18n="settingsHub.accessibility">Langue et accessibilité</strong><small data-i18n="settingsHub.accessibilityHelp">Langue, lisibilité, contraste et confort d’utilisation.</small></span>
+                <span class="settings-category-indicator" data-settings-indicator="accessibility" hidden></span><span class="settings-category-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="settings-category-card" type="button" data-settings-open-category="info" aria-controls="settingsPageInfo">
+                <span class="settings-category-icon" aria-hidden="true">ℹ️</span>
+                <span class="settings-category-copy"><strong data-i18n="settingsHub.info">Informations et état de l’application</strong><small data-i18n="settingsHub.infoHelp">État de la connexion, ressources hors ligne et sauvegarde.</small></span>
+                <span class="settings-category-indicator" data-settings-indicator="info" hidden></span><span class="settings-category-arrow" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </nav>
+
+          <section class="settings-category-page" id="settingsPageAppearance" data-settings-category-page="appearance" aria-labelledby="settingsPageAppearanceTitle" hidden inert>
+            <header class="settings-page-header">
+              <button class="settings-page-back" type="button" data-settings-back><span aria-hidden="true">←</span><span data-i18n="settingsHub.back">Retour aux catégories</span></button>
+              <div><p class="settings-page-eyebrow" data-i18n="settingsHub.title">Paramètres</p><h2 id="settingsPageAppearanceTitle" tabindex="-1" data-i18n="settingsHub.appearance">Apparence et personnalisation</h2><p data-i18n="settingsHub.appearanceHelp">Thème, couleurs, taille du texte et style de chaque espace.</p></div>
+            </header>
+            <div class="settings-page-content">
           <div class="feature-card plus-feature-card">
             <section id="settings" class="content-panel plus-settings-panel">
               <div class="plus-subsection plus-personalization">
                 <div class="plus-subsection-heading">
                   <span aria-hidden="true">🎨</span>
                   <div><h3 data-i18n="settings.appearance">Apparence &amp; préférences</h3><p data-i18n="settings.appearanceHelp">Personnalisez l’affichage selon vos envies.</p></div>
-                </div>
-                <div class="form-group plus-language-group">
-                  <label for="languageSelect" data-i18n="settings.language">Langue / Language</label>
-                  <select id="languageSelect" name="language" autocomplete="off" aria-describedby="languageHelp">
-                    <option value="fr">🇫🇷 Français</option>
-                    <option value="en">🇬🇧 English</option>
-                    <option value="es">🇪🇸 Español</option>
-                    <option value="pt">🇵🇹 Português</option>
-                    <option value="de">🇩🇪 Deutsch</option>
-                    <option value="it">🇮🇹 Italiano</option>
-                    <option value="ar">🇸🇦 العربية</option>
-                    <option value="zh">🇨🇳 中文</option>
-                  </select>
-                  <p id="languageHelp" class="form-help" data-i18n="settings.languageHelp">Ce choix est enregistré uniquement pour votre appareil et votre profil.</p>
                 </div>
                 <div class="form-group toggle-group plus-nickname-toggle">
                   <label for="showNicknames" data-i18n="settings.nicknameToggle">Afficher les surnoms à la place des prénoms</label>
@@ -836,15 +956,361 @@
                     <button type="button" class="theme-option" data-theme-choice="auto" data-i18n="theme.auto">🌗 Automatique</button>
                   </div>
                 </div>
+                <section class="visual-customizer" aria-labelledby="visualCustomizerTitle">
+                  <div class="visual-customizer-heading">
+                    <div><h4 id="visualCustomizerTitle" data-i18n="visual.title">Personnalisation visuelle</h4><p data-i18n="visual.help">Prévisualisez vos choix, puis appliquez-les à votre carnet.</p></div>
+                  </div>
+                  <div class="visual-customizer-layout">
+                    <div class="visual-customizer-controls">
+                      <div class="visual-customizer-card">
+                        <h5 data-i18n="visual.globalTitle">Style général</h5>
+                        <div class="visual-control-grid">
+                          <label class="visual-field" for="visualPalette"><span data-i18n="visual.paletteLabel">Palette premium</span>
+                            <select id="visualPalette">
+                              <option value="original" data-i18n="visual.paletteOriginal">Design d’origine</option>
+                              <option value="rose" data-i18n="visual.paletteRose">Rose précieux</option>
+                              <option value="lavender" data-i18n="visual.paletteLavender">Lavande royale</option>
+                              <option value="ocean" data-i18n="visual.paletteOcean">Océan profond</option>
+                              <option value="sage" data-i18n="visual.paletteSage">Jardin sauge</option>
+                              <option value="champagne" data-i18n="visual.paletteChampagne">Champagne</option>
+                              <option value="custom" data-i18n="visual.paletteCustom">Personnalisée</option>
+                            </select>
+                          </label>
+                          <label class="visual-field" for="visualPrimaryColor"><span data-i18n="visual.primaryColor">Couleur principale</span><input id="visualPrimaryColor" type="color" value="#ff5e8a"></label>
+                          <label class="visual-field" for="visualSecondaryColor"><span data-i18n="visual.secondaryColor">Couleur secondaire</span><input id="visualSecondaryColor" type="color" value="#a855f7"></label>
+                          <label class="visual-field" for="visualButtonShape"><span data-i18n="visual.buttonShape">Forme des boutons</span>
+                            <select id="visualButtonShape">
+                              <option value="original" data-i18n="visual.shapeOriginal">Forme d’origine</option>
+                              <option value="rounded" data-i18n="visual.shapeRounded">Arrondis doux</option>
+                              <option value="pill" data-i18n="visual.shapePill">Pilule</option>
+                              <option value="square" data-i18n="visual.shapeSquare">Carrés</option>
+                            </select>
+                          </label>
+                          <label class="visual-field" for="visualBackground"><span data-i18n="visual.background">Style d’arrière-plan</span>
+                            <select id="visualBackground">
+                              <option value="original" data-i18n="visual.backgroundOriginal">Arrière-plan d’origine</option>
+                              <option value="soft" data-i18n="visual.backgroundSoft">Voile doux</option>
+                              <option value="blush" data-i18n="visual.backgroundBlush">Dégradé romantique</option>
+                              <option value="aurora" data-i18n="visual.backgroundAurora">Aurore</option>
+                              <option value="ocean" data-i18n="visual.backgroundOcean">Brume océane</option>
+                              <option value="sage" data-i18n="visual.backgroundSage">Sauge légère</option>
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+                      <div class="visual-customizer-card">
+                        <h5 data-i18n="visual.sectionsTitle">Personnalisation par section</h5>
+                        <p class="visual-customizer-note" data-i18n="visual.sectionsHelp">Choisissez une couleur d’accent, un fond et les animations de chaque espace.</p>
+                        <div class="visual-section-list">
+                          <details class="visual-section-item">
+                            <summary data-i18n="visual.sectionHome">Accueil</summary>
+                            <div class="visual-section-options">
+                              <label class="visual-field"><span data-i18n="visual.sectionAccent">Couleur d’accent</span><select data-visual-accent="home"><option value="global" data-i18n="visual.accentGlobal">Suivre le style général</option><option value="rose" data-i18n="visual.paletteRose">Rose précieux</option><option value="lavender" data-i18n="visual.paletteLavender">Lavande royale</option><option value="ocean" data-i18n="visual.paletteOcean">Océan profond</option><option value="sage" data-i18n="visual.paletteSage">Jardin sauge</option><option value="champagne" data-i18n="visual.paletteChampagne">Champagne</option></select></label>
+                              <label class="visual-field"><span data-i18n="visual.sectionBackground">Arrière-plan de cette section</span><select data-visual-section-background="home"><option value="inherit" data-i18n="visual.backgroundInherit">Suivre le fond général</option><option value="soft" data-i18n="visual.backgroundSoft">Voile doux</option><option value="blush" data-i18n="visual.backgroundBlush">Dégradé romantique</option><option value="lavender" data-i18n="visual.backgroundLavender">Lavande légère</option><option value="ocean" data-i18n="visual.backgroundOcean">Brume océane</option><option value="sage" data-i18n="visual.backgroundSage">Sauge légère</option></select></label>
+                              <label class="visual-toggle" for="visualMotionHome"><span data-i18n="visual.sectionAnimationsOff">Réduire les animations dans cette section</span><input id="visualMotionHome" type="checkbox" data-visual-reduce-motion="home"></label>
+                            </div>
+                          </details>
+                          <details class="visual-section-item">
+                            <summary data-i18n="visual.sectionMessages">Messages</summary>
+                            <div class="visual-section-options">
+                              <label class="visual-field"><span data-i18n="visual.sectionAccent">Couleur d’accent</span><select data-visual-accent="messages"><option value="global" data-i18n="visual.accentGlobal">Suivre le style général</option><option value="rose" data-i18n="visual.paletteRose">Rose précieux</option><option value="lavender" data-i18n="visual.paletteLavender">Lavande royale</option><option value="ocean" data-i18n="visual.paletteOcean">Océan profond</option><option value="sage" data-i18n="visual.paletteSage">Jardin sauge</option><option value="champagne" data-i18n="visual.paletteChampagne">Champagne</option></select></label>
+                              <label class="visual-field"><span data-i18n="visual.sectionBackground">Arrière-plan de cette section</span><select data-visual-section-background="messages"><option value="inherit" data-i18n="visual.backgroundInherit">Suivre le fond général</option><option value="soft" data-i18n="visual.backgroundSoft">Voile doux</option><option value="blush" data-i18n="visual.backgroundBlush">Dégradé romantique</option><option value="lavender" data-i18n="visual.backgroundLavender">Lavande légère</option><option value="ocean" data-i18n="visual.backgroundOcean">Brume océane</option><option value="sage" data-i18n="visual.backgroundSage">Sauge légère</option></select></label>
+                              <label class="visual-toggle" for="visualMotionMessages"><span data-i18n="visual.sectionAnimationsOff">Réduire les animations dans cette section</span><input id="visualMotionMessages" type="checkbox" data-visual-reduce-motion="messages"></label>
+                            </div>
+                          </details>
+                          <details class="visual-section-item">
+                            <summary data-i18n="visual.sectionMemories">Souvenirs</summary>
+                            <div class="visual-section-options">
+                              <label class="visual-field"><span data-i18n="visual.sectionAccent">Couleur d’accent</span><select data-visual-accent="memories"><option value="global" data-i18n="visual.accentGlobal">Suivre le style général</option><option value="rose" data-i18n="visual.paletteRose">Rose précieux</option><option value="lavender" data-i18n="visual.paletteLavender">Lavande royale</option><option value="ocean" data-i18n="visual.paletteOcean">Océan profond</option><option value="sage" data-i18n="visual.paletteSage">Jardin sauge</option><option value="champagne" data-i18n="visual.paletteChampagne">Champagne</option></select></label>
+                              <label class="visual-field"><span data-i18n="visual.sectionBackground">Arrière-plan de cette section</span><select data-visual-section-background="memories"><option value="inherit" data-i18n="visual.backgroundInherit">Suivre le fond général</option><option value="soft" data-i18n="visual.backgroundSoft">Voile doux</option><option value="blush" data-i18n="visual.backgroundBlush">Dégradé romantique</option><option value="lavender" data-i18n="visual.backgroundLavender">Lavande légère</option><option value="ocean" data-i18n="visual.backgroundOcean">Brume océane</option><option value="sage" data-i18n="visual.backgroundSage">Sauge légère</option></select></label>
+                              <label class="visual-toggle" for="visualMotionMemories"><span data-i18n="visual.sectionAnimationsOff">Réduire les animations dans cette section</span><input id="visualMotionMemories" type="checkbox" data-visual-reduce-motion="memories"></label>
+                            </div>
+                          </details>
+                          <details class="visual-section-item">
+                            <summary data-i18n="visual.sectionGallery">Galerie</summary>
+                            <div class="visual-section-options">
+                              <label class="visual-field"><span data-i18n="visual.sectionAccent">Couleur d’accent</span><select data-visual-accent="gallery"><option value="global" data-i18n="visual.accentGlobal">Suivre le style général</option><option value="rose" data-i18n="visual.paletteRose">Rose précieux</option><option value="lavender" data-i18n="visual.paletteLavender">Lavande royale</option><option value="ocean" data-i18n="visual.paletteOcean">Océan profond</option><option value="sage" data-i18n="visual.paletteSage">Jardin sauge</option><option value="champagne" data-i18n="visual.paletteChampagne">Champagne</option></select></label>
+                              <label class="visual-field"><span data-i18n="visual.sectionBackground">Arrière-plan de cette section</span><select data-visual-section-background="gallery"><option value="inherit" data-i18n="visual.backgroundInherit">Suivre le fond général</option><option value="soft" data-i18n="visual.backgroundSoft">Voile doux</option><option value="blush" data-i18n="visual.backgroundBlush">Dégradé romantique</option><option value="lavender" data-i18n="visual.backgroundLavender">Lavande légère</option><option value="ocean" data-i18n="visual.backgroundOcean">Brume océane</option><option value="sage" data-i18n="visual.backgroundSage">Sauge légère</option></select></label>
+                              <label class="visual-toggle" for="visualMotionGallery"><span data-i18n="visual.sectionAnimationsOff">Réduire les animations dans cette section</span><input id="visualMotionGallery" type="checkbox" data-visual-reduce-motion="gallery"></label>
+                            </div>
+                          </details>
+                          <details class="visual-section-item">
+                            <summary data-i18n="visual.sectionMusic">Musique</summary>
+                            <div class="visual-section-options">
+                              <label class="visual-field"><span data-i18n="visual.sectionAccent">Couleur d’accent</span><select data-visual-accent="music"><option value="global" data-i18n="visual.accentGlobal">Suivre le style général</option><option value="rose" data-i18n="visual.paletteRose">Rose précieux</option><option value="lavender" data-i18n="visual.paletteLavender">Lavande royale</option><option value="ocean" data-i18n="visual.paletteOcean">Océan profond</option><option value="sage" data-i18n="visual.paletteSage">Jardin sauge</option><option value="champagne" data-i18n="visual.paletteChampagne">Champagne</option></select></label>
+                              <label class="visual-field"><span data-i18n="visual.sectionBackground">Arrière-plan de cette section</span><select data-visual-section-background="music"><option value="inherit" data-i18n="visual.backgroundInherit">Suivre le fond général</option><option value="soft" data-i18n="visual.backgroundSoft">Voile doux</option><option value="blush" data-i18n="visual.backgroundBlush">Dégradé romantique</option><option value="lavender" data-i18n="visual.backgroundLavender">Lavande légère</option><option value="ocean" data-i18n="visual.backgroundOcean">Brume océane</option><option value="sage" data-i18n="visual.backgroundSage">Sauge légère</option></select></label>
+                              <label class="visual-toggle" for="visualMotionMusic"><span data-i18n="visual.sectionAnimationsOff">Réduire les animations dans cette section</span><input id="visualMotionMusic" type="checkbox" data-visual-reduce-motion="music"></label>
+                            </div>
+                          </details>
+                          <details class="visual-section-item">
+                            <summary data-i18n="visual.sectionGames">Jeux</summary>
+                            <div class="visual-section-options">
+                              <label class="visual-field"><span data-i18n="visual.sectionAccent">Couleur d’accent</span><select data-visual-accent="games"><option value="global" data-i18n="visual.accentGlobal">Suivre le style général</option><option value="rose" data-i18n="visual.paletteRose">Rose précieux</option><option value="lavender" data-i18n="visual.paletteLavender">Lavande royale</option><option value="ocean" data-i18n="visual.paletteOcean">Océan profond</option><option value="sage" data-i18n="visual.paletteSage">Jardin sauge</option><option value="champagne" data-i18n="visual.paletteChampagne">Champagne</option></select></label>
+                              <label class="visual-field"><span data-i18n="visual.sectionBackground">Arrière-plan de cette section</span><select data-visual-section-background="games"><option value="inherit" data-i18n="visual.backgroundInherit">Suivre le fond général</option><option value="soft" data-i18n="visual.backgroundSoft">Voile doux</option><option value="blush" data-i18n="visual.backgroundBlush">Dégradé romantique</option><option value="lavender" data-i18n="visual.backgroundLavender">Lavande légère</option><option value="ocean" data-i18n="visual.backgroundOcean">Brume océane</option><option value="sage" data-i18n="visual.backgroundSage">Sauge légère</option></select></label>
+                              <label class="visual-toggle" for="visualMotionGames"><span data-i18n="visual.sectionAnimationsOff">Réduire les animations dans cette section</span><input id="visualMotionGames" type="checkbox" data-visual-reduce-motion="games"></label>
+                            </div>
+                          </details>
+                          <details class="visual-section-item">
+                            <summary data-i18n="visual.sectionOther">Autres sections</summary>
+                            <div class="visual-section-options">
+                              <label class="visual-field"><span data-i18n="visual.sectionAccent">Couleur d’accent</span><select data-visual-accent="other"><option value="global" data-i18n="visual.accentGlobal">Suivre le style général</option><option value="rose" data-i18n="visual.paletteRose">Rose précieux</option><option value="lavender" data-i18n="visual.paletteLavender">Lavande royale</option><option value="ocean" data-i18n="visual.paletteOcean">Océan profond</option><option value="sage" data-i18n="visual.paletteSage">Jardin sauge</option><option value="champagne" data-i18n="visual.paletteChampagne">Champagne</option></select></label>
+                              <label class="visual-field"><span data-i18n="visual.sectionBackground">Arrière-plan de cette section</span><select data-visual-section-background="other"><option value="inherit" data-i18n="visual.backgroundInherit">Suivre le fond général</option><option value="soft" data-i18n="visual.backgroundSoft">Voile doux</option><option value="blush" data-i18n="visual.backgroundBlush">Dégradé romantique</option><option value="lavender" data-i18n="visual.backgroundLavender">Lavande légère</option><option value="ocean" data-i18n="visual.backgroundOcean">Brume océane</option><option value="sage" data-i18n="visual.backgroundSage">Sauge légère</option></select></label>
+                              <label class="visual-toggle" for="visualMotionOther"><span data-i18n="visual.sectionAnimationsOff">Réduire les animations dans cette section</span><input id="visualMotionOther" type="checkbox" data-visual-reduce-motion="other"></label>
+                            </div>
+                          </details>
+                        </div>
+                      </div>
+                    </div>
+                    <aside class="visual-preview" aria-live="polite">
+                      <h5 data-i18n="visual.previewTitle">Aperçu en direct</h5>
+                      <p data-i18n="visual.previewHelp">Les changements restent ici jusqu’à leur application.</p>
+                      <div class="visual-preview-card" id="visualPreviewCard">
+                        <strong data-i18n="visual.previewCardTitle">Notre Carnet ❤️</strong>
+                        <p data-i18n="visual.previewCardText">Un aperçu de votre nouvelle ambiance.</p>
+                        <button class="visual-preview-button" id="visualPreviewButton" type="button" data-i18n="visual.previewButton">Découvrir</button>
+                      </div>
+                      <div class="visual-preview-swatches" aria-hidden="true"><span></span><span></span><span></span></div>
+                    </aside>
+                  </div>
+                  <div class="visual-customizer-actions">
+                    <button class="visual-action-button visual-action-button--primary" id="visualApplyButton" data-visual-action="apply" type="button" data-i18n="visual.apply">Appliquer les changements</button>
+                    <button class="visual-action-button" id="visualCancelButton" data-visual-action="cancel" type="button" data-i18n="visual.cancel">Annuler les changements</button>
+                    <button class="visual-action-button visual-action-button--restore" id="visualRestoreButton" data-visual-action="restore" type="button" data-i18n="visual.restore">Restaurer le design d’origine</button>
+                  </div>
+                  <p class="visual-customizer-status" id="visualCustomizerStatus" data-visual-status role="status" aria-live="polite"></p>
+                </section>
               </div>
             </section>
           </div>
 
-          <div class="plus-category-heading">
-            <span class="plus-category-icon" aria-hidden="true">⚙</span>
-            <div><h2 data-i18n="settings.title">Paramètres</h2><p data-i18n="settings.backupHelp">Gardez une copie des données de votre carnet.</p></div>
-          </div>
+            </div>
+          </section>
+
+          <section class="settings-category-page" id="settingsPageAccessibility" data-settings-category-page="accessibility" aria-labelledby="settingsPageAccessibilityTitle" hidden inert>
+            <header class="settings-page-header">
+              <button class="settings-page-back" type="button" data-settings-back><span aria-hidden="true">←</span><span data-i18n="settingsHub.back">Retour aux catégories</span></button>
+              <div><p class="settings-page-eyebrow" data-i18n="settingsHub.title">Paramètres</p><h2 id="settingsPageAccessibilityTitle" tabindex="-1" data-i18n="settingsHub.accessibility">Langue et accessibilité</h2><p data-i18n="settingsHub.accessibilityHelp">Langue, lisibilité, contraste et confort d’utilisation.</p></div>
+            </header>
+            <div class="settings-page-content">
           <div class="feature-card plus-feature-card">
+            <section id="languageAccessibility" class="content-panel plus-settings-panel accessibility-settings" aria-labelledby="accessibilityTitle">
+              <div class="plus-subsection-heading">
+                <span aria-hidden="true">🌐</span>
+                <div><h3 id="accessibilityTitle" data-i18n="accessibility.languageTitle">Langue et confort visuel</h3><p data-i18n="accessibility.languageHelp">La langue est appliquée immédiatement et conservée pour votre profil sur cet appareil.</p></div>
+              </div>
+              <div class="form-group plus-language-group">
+                <label for="languageSelect" data-i18n="settings.language">Langue / Language</label>
+                <select id="languageSelect" name="language" autocomplete="off" aria-describedby="languageHelp">
+                  <option value="fr">🇫🇷 Français</option>
+                  <option value="en">🇬🇧 English</option>
+                  <option value="es">🇪🇸 Español</option>
+                  <option value="pt">🇵🇹 Português</option>
+                  <option value="de">🇩🇪 Deutsch</option>
+                  <option value="it">🇮🇹 Italiano</option>
+                  <option value="ar">🇸🇦 العربية</option>
+                  <option value="zh">🇨🇳 中文</option>
+                </select>
+                <p id="languageHelp" class="form-help" data-i18n="settings.languageHelp">Ce choix est enregistré uniquement pour votre appareil et votre profil.</p>
+              </div>
+              <div class="accessibility-control-card">
+                <h4 data-i18n="accessibility.readabilityTitle">Taille et lisibilité</h4>
+                <p class="accessibility-help" data-i18n="accessibility.readabilityHelp">Choisissez une taille de texte de 85 % à 120 %, par pas de 5 %.</p>
+                <div class="visual-control-grid accessibility-control-grid">
+                  <label class="visual-field visual-field--range" for="visualTextScale">
+                    <span data-i18n="visual.textSize">Taille du texte</span>
+                    <span class="visual-range-control"><input id="visualTextScale" type="range" min="85" max="120" step="5" value="100"><output id="visualTextScaleOutput" for="visualTextScale">100%</output></span>
+                  </label>
+                  <label class="visual-toggle" for="accessibilityContrast">
+                    <span data-i18n="accessibility.highContrast">Contraste renforcé</span>
+                    <input id="accessibilityContrast" type="checkbox">
+                  </label>
+                </div>
+                <p class="accessibility-help" data-i18n="accessibility.systemContrast">La préférence de contraste du système est également suivie si le navigateur la prend en charge.</p>
+              </div>
+              <div class="accessibility-control-card">
+                <h4 data-i18n="accessibility.comfortTitle">Confort visuel et tactile</h4>
+                <div class="visual-section-options accessibility-options">
+                  <label class="visual-toggle" for="visualAnimations">
+                    <span data-i18n="visual.animations">Réduire les animations</span>
+                    <input id="visualAnimations" type="checkbox">
+                  </label>
+                  <label class="visual-toggle" for="accessibilityEffects">
+                    <span data-i18n="accessibility.reduceEffects">Atténuer les effets visuels</span>
+                    <input id="accessibilityEffects" type="checkbox">
+                  </label>
+                  <label class="visual-toggle" for="accessibilityTargets">
+                    <span data-i18n="accessibility.largeTargets">Agrandir les zones tactiles</span>
+                    <input id="accessibilityTargets" type="checkbox">
+                  </label>
+                  <label class="visual-toggle" for="accessibilityOneHand">
+                    <span data-i18n="accessibility.oneHand">Navigation à une main sur mobile</span>
+                    <input id="accessibilityOneHand" type="checkbox">
+                  </label>
+                </div>
+                <p class="accessibility-help" data-i18n="accessibility.systemMotion">La réduction des animations du système est respectée lorsqu’elle est activée sur votre appareil.</p>
+                <p class="accessibility-help" data-i18n="accessibility.oneHandHelp">Sur mobile, déplace la navigation principale en bas de l’écran. Sans effet sur ordinateur.</p>
+              </div>
+              <p class="accessibility-apply-help" data-i18n="accessibility.applyHelp">Les réglages d’accessibilité sont prévisualisés immédiatement; utilisez Appliquer pour les conserver, ou Annuler pour revenir aux réglages enregistrés.</p>
+              <div class="visual-customizer-actions accessibility-actions">
+                <button class="visual-action-button visual-action-button--primary" data-visual-action="apply" type="button" data-i18n="visual.apply">Appliquer les changements</button>
+                <button class="visual-action-button" data-visual-action="cancel" type="button" data-i18n="visual.cancel">Annuler les changements</button>
+                <button class="visual-action-button visual-action-button--restore" data-visual-action="restore" type="button" data-i18n="visual.restore">Restaurer le design d’origine</button>
+              </div>
+              <p class="visual-customizer-status" data-visual-status role="status" aria-live="polite"></p>
+            </section>
+          </div>
+
+            </div>
+          </section>
+
+          <section class="settings-category-page" id="settingsPageStorage" data-settings-category-page="storage" aria-labelledby="settingsPageStorageTitle" hidden inert>
+            <header class="settings-page-header">
+              <button class="settings-page-back" type="button" data-settings-back><span aria-hidden="true">←</span><span data-i18n="settingsHub.back">Retour aux catégories</span></button>
+              <div><p class="settings-page-eyebrow" data-i18n="settingsHub.title">Paramètres</p><h2 id="settingsPageStorageTitle" tabindex="-1" data-i18n="settingsHub.storage">Stockage</h2><p data-i18n="settingsHub.storageHelp">Espace local, fichiers, doublons et cache de l’application.</p></div>
+            </header>
+            <div class="settings-page-content">
+          <div class="feature-card plus-feature-card">
+            <section class="content-panel plus-settings-panel storage-dashboard" aria-labelledby="storageDashboardTitle">
+              <div class="storage-dashboard-heading">
+                <div>
+                  <h3 id="storageDashboardTitle" data-i18n="storage.localTitle">Stockage sur cet appareil</h3>
+                  <p data-i18n="storage.localHelp">Les tailles détaillées sont mesurées à partir des données accessibles à l’application; le quota du navigateur est une estimation globale.</p>
+                </div>
+                <button class="storage-action-button" id="storageRefreshButton" type="button" data-i18n="storage.refresh">Actualiser</button>
+              </div>
+              <p class="storage-estimate" id="storageEstimateStatus" role="status" aria-live="polite"></p>
+              <div class="storage-dashboard-grid">
+                <article class="storage-card storage-breakdown-card">
+                  <h4 data-i18n="storage.breakdownTitle">Répartition locale connue</h4>
+                  <p class="storage-card-help" data-i18n="storage.breakdownHelp">Estimations des fichiers et données gérés par l’application; les caches sont affichés séparément.</p>
+                  <div class="storage-breakdown-layout">
+                    <div class="storage-donut" id="storageUsageChart" role="img" aria-label="Répartition du stockage local"></div>
+                    <ul class="storage-legend" id="storageBreakdown"></ul>
+                  </div>
+                </article>
+                <article class="storage-card storage-remote-card">
+                  <h4 data-i18n="storage.remoteTitle">Données distantes</h4>
+                  <p id="storageRemoteStatus" class="storage-card-help" role="status" aria-live="polite"></p>
+                  <p class="storage-remote-note" data-i18n="storage.remoteLimit">L’application n’utilise pas Supabase Storage. Les octets de la base Supabase ne sont pas exposés par l’application et ne peuvent pas être mesurés ici.</p>
+                </article>
+              </div>
+              <div class="storage-manager">
+                <div class="storage-manager-heading">
+                  <div>
+                    <h4 data-i18n="storage.filesTitle">Fichiers locaux</h4>
+                    <p class="storage-card-help" data-i18n="storage.filesHelp">Ouvrez un fichier pour le prévisualiser; aucune suppression n’est faite sans confirmation.</p>
+                  </div>
+                  <label class="storage-sort-control" for="storageFileSort">
+                    <span data-i18n="storage.sort">Trier</span>
+                    <select id="storageFileSort">
+                      <option value="size-desc" data-i18n="storage.sortSizeDesc">Taille : plus grands</option>
+                      <option value="size-asc" data-i18n="storage.sortSizeAsc">Taille : plus petits</option>
+                      <option value="date-desc" data-i18n="storage.sortDateDesc">Date : plus récents</option>
+                      <option value="date-asc" data-i18n="storage.sortDateAsc">Date : plus anciens</option>
+                    </select>
+                  </label>
+                </div>
+                <p id="storageLargeFilesStatus" class="storage-large-files" role="status" aria-live="polite"></p>
+                <ul class="storage-file-list" id="storageFileList" aria-live="polite"></ul>
+                <div class="storage-duplicates">
+                  <div>
+                    <h4 data-i18n="storage.duplicatesTitle">Doublons exacts</h4>
+                    <p class="storage-card-help" data-i18n="storage.duplicatesHelp">La comparaison utilise une empreinte des fichiers locaux accessibles; rien n’est supprimé automatiquement.</p>
+                  </div>
+                  <button class="storage-action-button" id="storageScanDuplicates" type="button" data-i18n="storage.scanDuplicates">Rechercher les doublons</button>
+                  <p id="storageDuplicateStatus" class="storage-duplicate-status" role="status" aria-live="polite"></p>
+                </div>
+              </div>
+              <div class="storage-dashboard-grid storage-bottom-grid">
+                <article class="storage-card">
+                  <h4 data-i18n="storage.tipsTitle">Conseils pour économiser de l’espace</h4>
+                  <ul class="storage-tips">
+                    <li data-i18n="storage.tipLargeFiles">Repérez les fichiers de plus de 10 Mio et prévisualisez-les avant toute suppression.</li>
+                    <li data-i18n="storage.tipExport">Exportez vos données avant de retirer des fichiers importants.</li>
+                    <li data-i18n="storage.tipLocal">Les photos et musiques de la galerie sont locales; leur suppression ne supprime pas les messages Supabase.</li>
+                  </ul>
+                </article>
+                <article class="storage-card storage-cache-card">
+                  <h4 data-i18n="storage.temporaryTitle">Cache de l’application</h4>
+                  <p id="storageCacheStatus" class="storage-card-help" role="status" aria-live="polite"></p>
+                  <p class="storage-cache-warning" data-i18n="storage.cacheOfflineWarning">Vider ce cache retire les ressources hors ligne; les fichiers personnels et les messages ne sont pas touchés.</p>
+                  <button class="storage-action-button storage-action-button--danger" id="storageClearCache" type="button" hidden data-i18n="storage.clearCache">Vider le cache de l’application</button>
+                </article>
+              </div>
+              <p id="storageManagerStatus" class="storage-manager-status" role="status" aria-live="polite"></p>
+            </section>
+          </div>
+
+            </div>
+          </section>
+
+          <section class="settings-category-page" id="settingsPagePrivacy" data-settings-category-page="privacy" aria-labelledby="settingsPagePrivacyTitle" hidden inert>
+            <header class="settings-page-header">
+              <button class="settings-page-back" type="button" data-settings-back><span aria-hidden="true">←</span><span data-i18n="settingsHub.back">Retour aux catégories</span></button>
+              <div><p class="settings-page-eyebrow" data-i18n="settingsHub.title">Paramètres</p><h2 id="settingsPagePrivacyTitle" tabindex="-1" data-i18n="settingsHub.privacy">Confidentialité et sécurité</h2><p data-i18n="settingsHub.privacyHelp">Verrouillage de l’application et protection de votre accès.</p></div>
+            </header>
+            <div class="settings-page-content">
+          <div class="feature-card plus-feature-card">
+            <section class="content-panel plus-settings-panel" aria-labelledby="appLockHeading">
+              <div class="plus-subsection-heading">
+                <span aria-hidden="true">🔐</span>
+                <div><h3 id="appLockHeading" data-i18n="privacy.lockTitle">Verrouillage de l’application</h3><p data-i18n="privacy.lockHelp">Choisissez un code PIN personnel pour cet appareil.</p></div>
+              </div>
+              <div class="app-lock-settings">
+                <label class="app-lock-enable" for="appLockEnabled">
+                  <span data-i18n="privacy.enableLock">Activer le verrouillage</span>
+                  <input id="appLockEnabled" type="checkbox">
+                </label>
+                <div class="app-lock-pin-options">
+                  <label for="appLockPinLength" data-i18n="privacy.pinLength">Longueur du code PIN</label>
+                  <select id="appLockPinLength">
+                    <option value="4" data-i18n="privacy.digits4">4 chiffres</option>
+                    <option value="6" data-i18n="privacy.digits6">6 chiffres</option>
+                  </select>
+                  <button class="btn-secondary" id="appLockConfigure" type="button" data-i18n="privacy.configurePin">Configurer le code PIN</button>
+                </div>
+                <p class="form-help" data-i18n="privacy.localNote">Le code est protégé et enregistré uniquement dans ce navigateur.</p>
+                <p class="form-help" data-i18n="privacy.biometricUnavailable">Le déverrouillage par empreinte n’est pas disponible dans cette version web.</p>
+              </div>
+            </section>
+          </div>
+
+            </div>
+          </section>
+
+          <section class="settings-category-page" id="settingsPageNotifications" data-settings-category-page="notifications" aria-labelledby="settingsPageNotificationsTitle" hidden inert>
+            <header class="settings-page-header">
+              <button class="settings-page-back" type="button" data-settings-back><span aria-hidden="true">←</span><span data-i18n="settingsHub.back">Retour aux catégories</span></button>
+              <div><p class="settings-page-eyebrow" data-i18n="settingsHub.title">Paramètres</p><h2 id="settingsPageNotificationsTitle" tabindex="-1" data-i18n="settingsHub.notifications">Notifications</h2><p data-i18n="settingsHub.notificationsHelp">Alertes, sons, vibrations, plage silencieuse et confidentialité.</p></div>
+            </header>
+            <div class="settings-page-content" id="settingsNotificationsContent"></div>
+          </section>
+
+          <section class="settings-category-page" id="settingsPageInfo" data-settings-category-page="info" aria-labelledby="settingsPageInfoTitle" hidden inert>
+            <header class="settings-page-header">
+              <button class="settings-page-back" type="button" data-settings-back><span aria-hidden="true">←</span><span data-i18n="settingsHub.back">Retour aux catégories</span></button>
+              <div><p class="settings-page-eyebrow" data-i18n="settingsHub.title">Paramètres</p><h2 id="settingsPageInfoTitle" tabindex="-1" data-i18n="settingsHub.info">Informations et état de l’application</h2><p data-i18n="settingsHub.infoHelp">État de la connexion, ressources hors ligne et sauvegarde.</p></div>
+            </header>
+            <div class="settings-page-content">
+          <div class="feature-card plus-feature-card">
+            <section class="content-panel plus-settings-panel app-status-panel" aria-labelledby="appStatusTitle">
+              <div class="plus-subsection-heading">
+                <span aria-hidden="true">📡</span>
+                <div><h3 id="appStatusTitle" data-i18n="settingsHub.statusTitle">État de l’application</h3><p data-i18n="settingsHub.statusHelp">Informations techniques de cet appareil et de ce navigateur.</p></div>
+              </div>
+              <div class="app-status-grid">
+                <article class="app-status-card">
+                  <h4 data-i18n="settingsHub.networkTitle">Connexion réseau</h4>
+                  <strong id="appNetworkStatus" role="status" aria-live="polite"></strong>
+                  <p data-i18n="settingsHub.networkHelp">Cet état reflète la connexion indiquée par le navigateur et ne garantit pas la disponibilité de Supabase.</p>
+                </article>
+                <article class="app-status-card">
+                  <h4 data-i18n="settingsHub.workerTitle">Ressources hors ligne</h4>
+                  <strong id="appServiceWorkerStatus" role="status" aria-live="polite"></strong>
+                  <p data-i18n="settingsHub.workerHelp">Le cache hors ligne nécessite un navigateur compatible et un site servi en HTTPS ou sur localhost.</p>
+                </article>
+              </div>
+            </section>
             <section id="backup" class="content-panel plus-backup-panel">
               <div class="section-header">
                 <div><h2 data-i18n="settings.backupTitle">💾 Sauvegarde &amp; données</h2><p data-i18n="settings.backupDescription">Exportez ou restaurez les données de l’application.</p></div>
@@ -856,11 +1322,25 @@
               </div>
             </section>
           </div>
+            </div>
+          </section>
 
         </div>
         <footer class="plus-footer">Notre Carnet <span aria-label="cœur">❤️</span> — Chaque souvenir compte.</footer>
       </section>
     </main>
+
+    <dialog class="storage-preview-dialog" id="storagePreviewDialog" aria-labelledby="storagePreviewTitle">
+      <div class="storage-preview-header">
+        <h3 id="storagePreviewTitle" data-i18n="storage.previewTitle">Aperçu du fichier</h3>
+        <button class="btn-close" id="storagePreviewClose" type="button" aria-label="Fermer" data-i18n-attr="aria-label" data-i18n-aria-label="storage.close">&times;</button>
+      </div>
+      <div class="storage-preview-content" id="storagePreviewContent"></div>
+      <div class="storage-preview-actions">
+        <button class="storage-action-button storage-action-button--danger" id="storagePreviewDelete" type="button" data-i18n="storage.delete">Supprimer ce fichier</button>
+        <button class="storage-action-button" id="storagePreviewCancel" type="button" data-i18n="storage.cancel">Fermer</button>
+      </div>
+    </dialog>
 
     <!-- Modal Souvenir -->
     <div class="modal-overlay" id="memoryModal" hidden>
@@ -1044,6 +1524,26 @@
     </div>
   </div>
 
-  <script src="js/script.js?v=20261126i"></script>
+  <section class="app-lock-screen" id="appLockScreen" role="dialog" aria-modal="true" aria-labelledby="appLockTitle" aria-describedby="appLockSubtitle" hidden>
+    <div class="app-lock-card">
+      <div class="app-lock-heart" aria-hidden="true">♥</div>
+      <p class="app-lock-brand">NOTRE CARNET ❤️</p>
+      <h1 id="appLockTitle" data-i18n="lock.title">Votre carnet est verrouillé</h1>
+      <p id="appLockSubtitle" class="app-lock-subtitle" data-i18n="lock.subtitle">Saisissez votre code personnel pour continuer.</p>
+      <p id="appLockPrompt" class="app-lock-prompt" aria-live="polite"></p>
+      <div class="app-lock-dots" id="appLockDots" role="img" aria-label="Code PIN" data-i18n-attr="aria-label" data-i18n-aria-label="lock.pinLabel"></div>
+      <p class="app-lock-error" id="appLockError" role="alert" aria-live="assertive"></p>
+      <div class="app-lock-keypad" id="appLockKeypad" aria-label="Clavier numérique" data-i18n-attr="aria-label" data-i18n-aria-label="lock.keypadLabel">
+        <button type="button" data-pin-digit="1">1</button><button type="button" data-pin-digit="2">2</button><button type="button" data-pin-digit="3">3</button>
+        <button type="button" data-pin-digit="4">4</button><button type="button" data-pin-digit="5">5</button><button type="button" data-pin-digit="6">6</button>
+        <button type="button" data-pin-digit="7">7</button><button type="button" data-pin-digit="8">8</button><button type="button" data-pin-digit="9">9</button>
+        <button type="button" class="app-lock-cancel" id="appLockCancel" data-i18n="lock.cancel">Annuler</button>
+        <button type="button" data-pin-digit="0">0</button>
+        <button type="button" class="app-lock-backspace" id="appLockBackspace" aria-label="Effacer le dernier chiffre" data-i18n-attr="aria-label" data-i18n-aria-label="lock.backspace">⌫</button>
+      </div>
+    </div>
+  </section>
+
+  <script src="js/script.js?v=20261126n"></script>
 </body>
 </html>

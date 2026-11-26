@@ -1529,6 +1529,30 @@ function updateMessageSettingsSummary() {
   if (createdDate) createdDate.textContent = window.I18n?.t('chat.dateUnavailable') || 'Date indisponible';
 }
 
+async function removeMessageBackgroundFromSettings() {
+  messageBackgroundSelectionId += 1;
+  messageBackgroundSaving = false;
+  try {
+    await deleteMessageBackgroundImage();
+    if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
+    if (messageBackgroundObjectUrl) URL.revokeObjectURL(messageBackgroundObjectUrl);
+    previewMessageBackgroundUrl = null;
+    messageBackgroundObjectUrl = null;
+    pendingMessageBackgroundFile = null;
+    hasStoredMessageBackground = false;
+    saveMessageSettings({ backgroundMode: 'preset' });
+    updateMessageBackgroundControls();
+    showToast(window.I18n?.t('chat.backgroundDeleted') || 'Votre image de fond a été supprimée.');
+    return true;
+  } catch (error) {
+    console.error('Échec de la suppression du fond personnel.', error);
+    showToast(window.I18n?.t('chat.backgroundDeleteFailed') || 'Impossible de supprimer cette image.');
+    return false;
+  }
+}
+
+window.removeMessageBackgroundFromSettings = removeMessageBackgroundFromSettings;
+
 function initMessageSettingsPanel() {
   const details = document.querySelector('.messages-settings-menu');
   if (!details) return;
@@ -1688,24 +1712,7 @@ function initMessageSettingsPanel() {
       showToast(window.I18n?.t('chat.backgroundSaveFailed') || 'Impossible d’enregistrer cette image sur cet appareil.');
     }
   });
-  removeBackgroundButton?.addEventListener('click', async () => {
-    messageBackgroundSelectionId += 1;
-    messageBackgroundSaving = false;
-    try {
-      await deleteMessageBackgroundImage();
-      if (previewMessageBackgroundUrl) URL.revokeObjectURL(previewMessageBackgroundUrl);
-      if (messageBackgroundObjectUrl) URL.revokeObjectURL(messageBackgroundObjectUrl);
-      previewMessageBackgroundUrl = null;
-      messageBackgroundObjectUrl = null;
-      pendingMessageBackgroundFile = null;
-      hasStoredMessageBackground = false;
-      saveMessageSettings({ backgroundMode: 'preset' });
-      showToast(window.I18n?.t('chat.backgroundDeleted') || 'Votre image de fond a été supprimée.');
-    } catch (error) {
-      console.error('Échec de la suppression du fond personnel.', error);
-      showToast(window.I18n?.t('chat.backgroundDeleteFailed') || 'Impossible de supprimer cette image.');
-    }
-  });
+  removeBackgroundButton?.addEventListener('click', removeMessageBackgroundFromSettings);
   loadStoredMessageBackgroundState();
 
   bindSelect('messageBubbleColorSelect', 'bubbleColor');
@@ -3329,12 +3336,135 @@ function createPlaceholderSVG(emoji) {
 
 /* ===== Navigation ===== */
 
+function getSettingsCategoryPage() {
+  return document.querySelector('[data-settings-category-page]:not([hidden])');
+}
+
+function refreshSettingsCategoryIndicators() {
+  const activeSettings = {
+    notifications: !!document.getElementById('notificationAllEnabled')?.checked,
+    privacy: !!document.getElementById('appLockEnabled')?.checked
+  };
+  document.querySelectorAll('[data-settings-indicator]').forEach(indicator => {
+    const active = !!activeSettings[indicator.dataset.settingsIndicator];
+    indicator.hidden = !active;
+    indicator.textContent = active ? (window.I18n?.t('settingsHub.active') || 'Enabled') : '';
+  });
+}
+
+function closeSettingsCategoryPage(returnFocus = true) {
+  const page = getSettingsCategoryPage();
+  if (!page) return false;
+  const category = page.dataset.settingsCategoryPage;
+  page.hidden = true;
+  page.inert = true;
+  const hub = document.getElementById('settingsCategoryHub');
+  if (hub) {
+    hub.hidden = false;
+    hub.inert = false;
+  }
+  refreshSettingsCategoryIndicators();
+  if (returnFocus) {
+    document.querySelector(`[data-settings-open-category="${category}"]`)?.focus();
+  }
+  return true;
+}
+
+function openSettingsCategory(category, focusHeading = true) {
+  const page = document.querySelector(`[data-settings-category-page="${category}"]`);
+  const hub = document.getElementById('settingsCategoryHub');
+  if (!page || !hub) return false;
+
+  document.querySelectorAll('[data-settings-category-page]').forEach(item => {
+    item.hidden = item !== page;
+    item.inert = item !== page;
+  });
+  hub.hidden = true;
+  hub.inert = true;
+  refreshSettingsCategoryIndicators();
+  if (focusHeading) page.querySelector('[id$="Title"]')?.focus();
+  syncAppBackSentinel();
+  return true;
+}
+
+function initSettingsNavigation() {
+  const hub = document.getElementById('settingsCategoryHub');
+  const notificationPanel = document.getElementById('settingsPanelNotifications');
+  const notificationHost = document.getElementById('settingsNotificationsContent');
+  if (!hub) return;
+
+  if (notificationPanel && notificationHost) {
+    const shortcut = document.createElement('section');
+    shortcut.className = 'messages-settings-view';
+    shortcut.id = 'settingsPanelNotifications';
+    shortcut.dataset.settingsPanel = 'notifications';
+    shortcut.setAttribute('role', 'tabpanel');
+    shortcut.setAttribute('aria-labelledby', 'settingsTabNotifications');
+    shortcut.hidden = true;
+
+    const heading = document.createElement('h4');
+    const note = document.createElement('p');
+    note.className = 'messages-settings-note';
+    const button = document.createElement('button');
+    button.className = 'messages-settings-secondary';
+    button.type = 'button';
+    button.dataset.settingsOpenCategory = 'notifications';
+    shortcut.append(heading, note, button);
+
+    const renderShortcut = () => {
+      heading.textContent = window.I18n?.t('chat.notifications') || 'Notifications';
+      note.textContent = window.I18n?.t('settingsHub.notificationShortcutHelp') || 'Manage notification preferences in Settings.';
+      button.textContent = window.I18n?.t('settingsHub.openNotifications') || 'Manage notifications';
+    };
+    renderShortcut();
+    window.addEventListener('carnet:languagechange', renderShortcut);
+
+    notificationPanel.replaceWith(shortcut);
+    notificationPanel.id = 'appNotificationSettings';
+    notificationPanel.classList.remove('messages-settings-view', 'is-active');
+    notificationPanel.removeAttribute('role');
+    notificationPanel.removeAttribute('aria-labelledby');
+    notificationPanel.removeAttribute('data-settings-panel');
+    notificationPanel.hidden = false;
+    notificationPanel.querySelector('.messages-settings-note')?.classList.add('notification-settings-note');
+
+    const card = document.createElement('div');
+    card.className = 'feature-card plus-feature-card';
+    card.append(notificationPanel);
+    notificationHost.append(card);
+  } else {
+    console.error('The notification settings panel could not be moved into the settings category.');
+  }
+
+  document.addEventListener('click', event => {
+    const openButton = event.target.closest('[data-settings-open-category]');
+    if (openButton) {
+      event.preventDefault();
+      const messageSettings = openButton.closest('.messages-settings-menu');
+      if (messageSettings) messageSettings.open = false;
+      if (getAppCurrentSection() !== 'plus') {
+        recordAppSection('plus');
+        setAppActiveSection('plus');
+      }
+      openSettingsCategory(openButton.dataset.settingsOpenCategory);
+      return;
+    }
+
+    const backButton = event.target.closest('[data-settings-back]');
+    if (backButton && closeSettingsCategoryPage()) syncAppBackSentinel();
+  });
+
+  document.getElementById('notificationAllEnabled')?.addEventListener('change', refreshSettingsCategoryIndicators);
+  document.getElementById('appLockEnabled')?.addEventListener('change', refreshSettingsCategoryIndicators);
+  window.addEventListener('carnet:languagechange', refreshSettingsCategoryIndicators);
+  refreshSettingsCategoryIndicators();
+}
+
 const APP_BACK_SENTINEL_KEY = '__notreCarnetBackSentinel';
-const APP_SECTION_HISTORY_LIMIT = 8;
-let appSectionHistory = [];
 let appBackSentinelActive = false;
-let appIgnoreNextPopState = false;
 let appBackSurfaceObserver = null;
+let appLastHomeBackAt = 0;
+let appBackExitPending = false;
 
 function getAppCurrentSection() {
   return document.querySelector('.section.active')?.id || 'accueil';
@@ -3349,11 +3479,25 @@ function updateNavMenuForActiveSection() {
 }
 
 function getOpenBackSurface() {
+  const appLockScreen = document.getElementById('appLockScreen');
+  if (appLockScreen && (
+    document.documentElement.dataset.appLockBoot === 'locked' ||
+    (!appLockScreen.hidden && appLockScreen.classList.contains('is-locked'))
+  )) {
+    return { type: 'app-lock', element: appLockScreen };
+  }
+  if (appLockScreen && !appLockScreen.hidden) {
+    return { type: 'app-lock-configuration', element: appLockScreen };
+  }
+
   const dialog = document.querySelector('dialog[open]');
   if (dialog) return { type: 'dialog', element: dialog };
 
+  const galleryMenu = document.getElementById('galleryActionMenu');
+  if (galleryMenu && !galleryMenu.hidden) return { type: 'gallery-menu', element: galleryMenu };
+
   const overlays = Array.from(document.querySelectorAll(
-    '.lightbox:not([hidden]), .modal-overlay:not([hidden]):not(#onboardingModal)'
+    '.lightbox:not([hidden]):not(.is-closing), .modal-overlay:not([hidden])'
   ));
   if (overlays.length) {
     overlays.sort((left, right) => {
@@ -3364,11 +3508,17 @@ function getOpenBackSurface() {
     return { type: 'overlay', element: overlays[overlays.length - 1] };
   }
 
-  const openDetails = Array.from(document.querySelectorAll('details[open]'));
-  if (openDetails.length) return { type: 'details', element: openDetails[openDetails.length - 1] };
-
   const navLinks = document.getElementById('navLinks');
   if (navLinks?.classList.contains('open')) return { type: 'navigation', element: navLinks };
+
+  const openDetails = Array.from(document.querySelectorAll('details[open]'))
+    .filter(details => !details.closest('[hidden], [inert]'));
+  if (openDetails.length) return { type: 'details', element: openDetails[openDetails.length - 1] };
+
+  const settingsPage = getSettingsCategoryPage();
+  if (settingsPage && getAppCurrentSection() === 'plus') {
+    return { type: 'settings-category', element: settingsPage };
+  }
 
   return null;
 }
@@ -3383,6 +3533,12 @@ function closeTopmostBackSurface() {
     } else {
       surface.element.close();
     }
+  } else if (surface.type === 'app-lock') {
+    return true;
+  } else if (surface.type === 'app-lock-configuration') {
+    document.getElementById('appLockCancel')?.click();
+  } else if (surface.type === 'gallery-menu') {
+    closeGalleryActionMenu(true);
   } else if (surface.type === 'overlay') {
     if (surface.element.id === 'lightbox') {
       closeLightbox();
@@ -3391,6 +3547,8 @@ function closeTopmostBackSurface() {
     }
   } else if (surface.type === 'details') {
     surface.element.open = false;
+  } else if (surface.type === 'settings-category') {
+    closeSettingsCategoryPage();
   } else {
     surface.element.classList.remove('open');
     document.getElementById('navToggle')?.setAttribute('aria-expanded', 'false');
@@ -3401,6 +3559,9 @@ function closeTopmostBackSurface() {
 
 function setAppActiveSection(target) {
   if (!document.getElementById(target)?.classList.contains('section')) return;
+  appLastHomeBackAt = 0;
+  appBackExitPending = false;
+  if (target !== 'plus') closeSettingsCategoryPage(false);
 
   document.querySelectorAll('.nav-link').forEach(link => {
     link.classList.toggle('active', link.dataset.section === target);
@@ -3531,72 +3692,85 @@ function ensureAppBackSentinel() {
   appBackSentinelActive = true;
 }
 
-function releaseAppBackSentinel() {
-  if (!appBackSentinelActive) return;
-  appBackSentinelActive = false;
-  appIgnoreNextPopState = true;
-  history.back();
+function syncAppBackSentinel() {
+  if (appBackExitPending && !getOpenBackSurface()) return;
+  appBackExitPending = false;
+  ensureAppBackSentinel();
 }
 
-function syncAppBackSentinel() {
-  if (getAppCurrentSection() !== 'accueil' || getOpenBackSurface()) {
-    ensureAppBackSentinel();
-  } else {
-    releaseAppBackSentinel();
+function resumeAppBackNavigation() {
+  if (!appBackExitPending) return;
+  appBackExitPending = false;
+  syncAppBackSentinel();
+}
+
+function isStandaloneApp() {
+  const displayMode = window.matchMedia?.('(display-mode: standalone)').matches;
+  return displayMode === true || window.navigator.standalone === true;
+}
+
+function requestAppClose() {
+  try {
+    window.close();
+  } catch (error) {
+    console.warn('The browser did not allow the app window to close.', error);
   }
+}
+
+function handleHomeBack() {
+  const now = Date.now();
+  if (appLastHomeBackAt && now - appLastHomeBackAt <= 2000) {
+    appLastHomeBackAt = 0;
+    appBackExitPending = isStandaloneApp();
+    const toast = document.getElementById('toast');
+    const exitPrompt = window.I18n?.t?.('navigation.exitPrompt') || 'Appuyez encore une fois pour quitter';
+    if (toast.textContent === exitPrompt) {
+      toast.classList.remove('show');
+      toast.textContent = '';
+    }
+    requestAppClose();
+    if (!appBackExitPending) syncAppBackSentinel();
+    return;
+  }
+
+  appLastHomeBackAt = now;
+  showToast(window.I18n?.t?.('navigation.exitPrompt') || 'Appuyez encore une fois pour quitter');
+  syncAppBackSentinel();
 }
 
 function navigateBackInApp() {
   if (closeTopmostBackSurface()) {
+    appLastHomeBackAt = 0;
     syncAppBackSentinel();
     return;
   }
-  if (appBackSentinelActive) {
-    history.back();
-    return;
-  }
-  if (appSectionHistory.length > 1) {
-    appSectionHistory.pop();
-    setAppActiveSection(appSectionHistory[appSectionHistory.length - 1]);
+  if (getAppCurrentSection() !== 'accueil') {
+    setAppActiveSection('accueil');
     syncAppBackSentinel();
-  }
-}
-
-function recordAppSection(target) {
-  const current = appSectionHistory[appSectionHistory.length - 1] || 'accueil';
-  if (target === current) return;
-  if (target === 'accueil') {
-    appSectionHistory = ['accueil'];
     return;
   }
-
-  appSectionHistory.push(target);
-  if (appSectionHistory.length > APP_SECTION_HISTORY_LIMIT) {
-    appSectionHistory = ['accueil', ...appSectionHistory.slice(-(APP_SECTION_HISTORY_LIMIT - 1))];
-  }
+  handleHomeBack();
 }
 
 function initNavigation() {
   const links = document.querySelectorAll('.nav-link');
   const navLinks = document.getElementById('navLinks');
   const navToggle = document.getElementById('navToggle');
-  appSectionHistory = [getAppCurrentSection()];
   appBackSentinelActive = !!history.state?.[APP_BACK_SENTINEL_KEY];
   updateNavMenuForActiveSection();
 
   window.addEventListener('popstate', event => {
-    if (appIgnoreNextPopState) {
-      appIgnoreNextPopState = false;
+    if (!appBackSentinelActive) {
+      if (appBackExitPending && event.state?.[APP_BACK_SENTINEL_KEY]) {
+        history.back();
+      } else if (event.state?.[APP_BACK_SENTINEL_KEY]) {
+        appBackSentinelActive = true;
+      }
       return;
     }
-    if (!appBackSentinelActive && !event.state?.[APP_BACK_SENTINEL_KEY]) return;
 
     appBackSentinelActive = false;
-    if (!closeTopmostBackSurface() && appSectionHistory.length > 1) {
-      appSectionHistory.pop();
-      setAppActiveSection(appSectionHistory[appSectionHistory.length - 1]);
-    }
-    syncAppBackSentinel();
+    navigateBackInApp();
   });
 
   if (!appBackSurfaceObserver && document.body) {
@@ -3614,7 +3788,6 @@ function initNavigation() {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const target = link.dataset.section;
-      recordAppSection(target);
       setAppActiveSection(target);
       syncAppBackSentinel();
     });
@@ -3625,7 +3798,9 @@ function initNavigation() {
     navToggle.setAttribute('aria-expanded', isOpen);
   });
 
+  document.addEventListener('keydown', resumeAppBackNavigation);
   document.addEventListener('pointerdown', event => {
+    resumeAppBackNavigation();
     if (!navLinks?.classList.contains('open')) return;
     if (navLinks.contains(event.target) || navToggle?.contains(event.target)) return;
     navLinks.classList.remove('open');
@@ -3654,6 +3829,9 @@ function applyTheme(themeMode, persist = true, notify = false) {
 
   document.documentElement.setAttribute('data-theme', effectiveTheme);
   document.documentElement.setAttribute('data-theme-mode', safeMode);
+  window.dispatchEvent(new CustomEvent('carnet:themechange', {
+    detail: { mode: safeMode, theme: effectiveTheme }
+  }));
 
   const metaThemeColor = document.querySelector('meta[name="theme-color"]');
   if (metaThemeColor) {
@@ -5063,6 +5241,57 @@ function initOffline() {
   updateOnlineStatus();
 }
 
+function initApplicationStatus() {
+  const networkStatus = document.getElementById('appNetworkStatus');
+  const serviceWorkerStatus = document.getElementById('appServiceWorkerStatus');
+  if (!networkStatus || !serviceWorkerStatus) return;
+
+  const translate = key => window.I18n?.t(key) || key;
+  const updateNetworkStatus = () => {
+    const online = navigator.onLine;
+    networkStatus.textContent = translate(online ? 'settingsHub.networkOnline' : 'settingsHub.networkOffline');
+    networkStatus.dataset.state = online ? 'online' : 'offline';
+  };
+  const updateServiceWorkerStatus = async () => {
+    if (!('serviceWorker' in navigator) || !window.isSecureContext) {
+      serviceWorkerStatus.textContent = translate('settingsHub.workerUnavailable');
+      serviceWorkerStatus.dataset.state = 'unavailable';
+      return;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.getRegistration('/');
+      const ready = registration?.active?.state === 'activated';
+      const starting = !!(registration?.installing || registration?.waiting);
+      serviceWorkerStatus.textContent = translate(
+        ready ? 'settingsHub.workerReady' : starting ? 'settingsHub.workerStarting' : 'settingsHub.workerUnavailable'
+      );
+      serviceWorkerStatus.dataset.state = ready ? 'ready' : starting ? 'starting' : 'unavailable';
+    } catch (error) {
+      console.warn('Could not read the offline resource status.', error);
+      serviceWorkerStatus.textContent = translate('settingsHub.workerUnavailable');
+      serviceWorkerStatus.dataset.state = 'unavailable';
+    }
+  };
+  const updateAllStatuses = () => {
+    updateNetworkStatus();
+    updateServiceWorkerStatus();
+  };
+
+  updateAllStatuses();
+  window.addEventListener('online', updateNetworkStatus);
+  window.addEventListener('offline', updateNetworkStatus);
+  window.addEventListener('carnet:languagechange', updateAllStatuses);
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    navigator.serviceWorker.addEventListener('controllerchange', updateServiceWorkerStatus);
+    navigator.serviceWorker.ready.then(updateServiceWorkerStatus).catch(error => {
+      console.warn('Could not confirm offline resource readiness.', error);
+      serviceWorkerStatus.textContent = translate('settingsHub.workerUnavailable');
+      serviceWorkerStatus.dataset.state = 'unavailable';
+    });
+  }
+}
+
 /* ===== Utilities ===== */
 
 function escapeHtml(str) {
@@ -5095,7 +5324,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateMessageSettingsSummary();
   });
   initTheme();
+  window.VisualCustomizer?.initialize();
   initSettings();
+  initSettingsNavigation();
   initEditableFields();
   initCouplePhoto();
   initDateModal();
@@ -5107,14 +5338,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   initMemories();
   initGallery();
   await initMessages();
+  window.NotificationCenter?.initialize(window.MessageModule);
+  refreshSettingsCategoryIndicators();
   initDates();
   initGoals();
   initPlaces();
   initBackup();
   initMedia();
+  window.StorageManager?.initialize();
   initChallenge();
   initGame();
   initPWA();
+  initApplicationStatus();
   initOffline();
   updateStats();
 });
