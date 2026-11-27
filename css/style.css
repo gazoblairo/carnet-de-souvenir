@@ -1035,6 +1035,46 @@ body::after {
   gap: 0.5rem;
 }
 
+.nav-smart-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 94, 138, 0.12), rgba(168, 85, 247, 0.12));
+  color: var(--text);
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.nav-smart-link:hover {
+  border-color: var(--primary);
+}
+
+.nav-smart-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: 0 0 auto;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.nav-smart-label {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.nav-smart-link.is-changing .nav-smart-icon,
+.nav-smart-link.is-changing .nav-smart-label {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.nav-smart-link[data-destination="multimedia"] .nav-smart-icon--games,
+.nav-smart-link[data-destination="jeux"] .nav-smart-icon--media {
+  display: none;
+}
+
 .nav-messages-link {
   display: inline-flex;
   align-items: center;
@@ -2936,6 +2976,23 @@ html[dir="rtl"] select {
 
   .nav-message-label {
     display: none;
+  }
+
+  .nav-smart-link {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+
+  .nav-smart-label {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-smart-icon,
+  .nav-smart-label {
+    transition: none;
   }
 }
 

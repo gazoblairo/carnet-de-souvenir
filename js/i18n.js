@@ -6,6 +6,7 @@
       messages: {
         'nav.home': '❤️ Accueil', 'nav.messages': '💌 Messages ❤️', 'nav.memories': '📝 Souvenirs',
         'nav.media': '📷 Médias', 'nav.games': '🎮 Jeux', 'nav.more': '⚙️ Plus', 'nav.messagesShort': 'Messages',
+        'nav.smartMedia': 'Médias', 'nav.smartGames': 'Jeux',
         'common.install': 'Installer', 'settings.preferences': 'Préférences de l’application',
         'settings.preferencesHelp': 'Choisissez l’apparence de votre carnet.', 'settings.appearance': 'Apparence & préférences',
         'settings.appearanceHelp': 'Personnalisez l’affichage selon vos envies.',
@@ -139,6 +140,7 @@
       messages: {
         'nav.home': '❤️ Home', 'nav.messages': '💌 Messages ❤️', 'nav.memories': '📝 Memories',
         'nav.media': '📷 Media', 'nav.games': '🎮 Games', 'nav.more': '⚙️ More', 'nav.messagesShort': 'Messages',
+        'nav.smartMedia': 'Media', 'nav.smartGames': 'Games',
         'common.install': 'Install', 'settings.preferences': 'App preferences',
         'settings.preferencesHelp': 'Choose how your journal looks.', 'settings.appearance': 'Appearance & preferences',
         'settings.appearanceHelp': 'Customize the display to suit you.',
@@ -272,6 +274,7 @@
       messages: {
         'nav.home': '❤️ Inicio', 'nav.messages': '💌 Mensajes ❤️', 'nav.memories': '📝 Recuerdos',
         'nav.media': '📷 Medios', 'nav.games': '🎮 Juegos', 'nav.more': '⚙️ Más', 'nav.messagesShort': 'Mensajes',
+        'nav.smartMedia': 'Medios', 'nav.smartGames': 'Juegos',
         'common.install': 'Instalar', 'settings.preferences': 'Preferencias de la aplicación',
         'settings.preferencesHelp': 'Elige el aspecto de tu diario.', 'settings.appearance': 'Apariencia y preferencias',
         'settings.appearanceHelp': 'Personaliza la visualización a tu gusto.',
@@ -405,6 +408,7 @@
       messages: {
         'nav.home': '❤️ Início', 'nav.messages': '💌 Mensagens ❤️', 'nav.memories': '📝 Memórias',
         'nav.media': '📷 Multimédia', 'nav.games': '🎮 Jogos', 'nav.more': '⚙️ Mais', 'nav.messagesShort': 'Mensagens',
+        'nav.smartMedia': 'Multimédia', 'nav.smartGames': 'Jogos',
         'common.install': 'Instalar', 'settings.preferences': 'Preferências da aplicação',
         'settings.preferencesHelp': 'Escolha o aspeto do seu diário.', 'settings.appearance': 'Aparência e preferências',
         'settings.appearanceHelp': 'Personalize a apresentação ao seu gosto.',
@@ -538,6 +542,7 @@
       messages: {
         'nav.home': '❤️ Startseite', 'nav.messages': '💌 Nachrichten ❤️', 'nav.memories': '📝 Erinnerungen',
         'nav.media': '📷 Medien', 'nav.games': '🎮 Spiele', 'nav.more': '⚙️ Mehr', 'nav.messagesShort': 'Nachrichten',
+        'nav.smartMedia': 'Medien', 'nav.smartGames': 'Spiele',
         'common.install': 'Installieren', 'settings.preferences': 'App-Einstellungen',
         'settings.preferencesHelp': 'Wähle das Erscheinungsbild deines Tagebuchs.', 'settings.appearance': 'Darstellung & Einstellungen',
         'settings.appearanceHelp': 'Passe die Anzeige an deine Wünsche an.',
@@ -671,6 +676,7 @@
       messages: {
         'nav.home': '❤️ Home', 'nav.messages': '💌 Messaggi ❤️', 'nav.memories': '📝 Ricordi',
         'nav.media': '📷 Media', 'nav.games': '🎮 Giochi', 'nav.more': '⚙️ Altro', 'nav.messagesShort': 'Messaggi',
+        'nav.smartMedia': 'Media', 'nav.smartGames': 'Giochi',
         'common.install': 'Installa', 'settings.preferences': 'Preferenze dell’app',
         'settings.preferencesHelp': 'Scegli l’aspetto del tuo diario.', 'settings.appearance': 'Aspetto e preferenze',
         'settings.appearanceHelp': 'Personalizza la visualizzazione come preferisci.',
@@ -804,6 +810,7 @@
       messages: {
         'nav.home': '❤️ الرئيسية', 'nav.messages': '💌 الرسائل ❤️', 'nav.memories': '📝 الذكريات',
         'nav.media': '📷 الوسائط', 'nav.games': '🎮 الألعاب', 'nav.more': '⚙️ المزيد', 'nav.messagesShort': 'الرسائل',
+        'nav.smartMedia': 'الوسائط', 'nav.smartGames': 'الألعاب',
         'common.install': 'تثبيت', 'settings.preferences': 'تفضيلات التطبيق',
         'settings.preferencesHelp': 'اختر مظهر دفتر يومياتكما.', 'settings.appearance': 'المظهر والتفضيلات',
         'settings.appearanceHelp': 'خصّص طريقة العرض كما تحب.',
@@ -937,6 +944,7 @@
       messages: {
         'nav.home': '❤️ 首页', 'nav.messages': '💌 消息 ❤️', 'nav.memories': '📝 回忆',
         'nav.media': '📷 媒体', 'nav.games': '🎮 游戏', 'nav.more': '⚙️ 更多', 'nav.messagesShort': '消息',
+        'nav.smartMedia': '媒体', 'nav.smartGames': '游戏',
         'common.install': '安装', 'settings.preferences': '应用偏好设置',
         'settings.preferencesHelp': '选择日记本的外观。', 'settings.appearance': '外观与偏好设置',
         'settings.appearanceHelp': '按你的喜好自定义显示效果。',

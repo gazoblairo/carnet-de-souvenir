@@ -1,10 +1,10 @@
-const CACHE_NAME = 'carnet-v84';
+const CACHE_NAME = 'carnet-v85';
 const ASSETS = [
   '/',
   '/index.html',
-  '/css/style.css?v=20261127f',
-  '/js/i18n.js?v=20261127b',
-  '/js/script.js?v=20261127g',
+  '/css/style.css?v=20261127g',
+  '/js/i18n.js?v=20261127c',
+  '/js/script.js?v=20261127h',
   '/js/app-lock.js?v=20261126f',
   '/js/notifications.js?v=20261126f',
   '/js/visual-customizer.js?v=20261126b',

@@ -12,7 +12,7 @@
   <script src="supabase.js"></script>
   <script src="js/realtime.js"></script>
   <script src="js/messages.js"></script>
-  <script src="js/i18n.js?v=20261127b"></script>
+  <script src="js/i18n.js?v=20261127c"></script>
   <script src="js/app-lock.js?v=20261126f"></script>
   <script src="js/notifications.js?v=20261126f"></script>
   <script src="js/visual-customizer.js?v=20261126b"></script>
@@ -43,7 +43,7 @@
   <link rel="icon" type="image/x-icon" href="/assets/icons/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=20261127f">
+  <link rel="stylesheet" href="css/style.css?v=20261127g">
 </head>
 <body>
   <div id="app">
@@ -65,6 +65,18 @@
         <li><a href="#plus" class="nav-link" data-section="plus" data-i18n="nav.more">⚙️ Plus</a></li>
       </ul>
       <div class="nav-actions">
+        <a href="#multimedia" class="nav-link nav-smart-link" id="smartNavLink" data-section="multimedia" data-destination="multimedia" aria-label="Médias" title="Médias">
+          <svg class="nav-smart-icon nav-smart-icon--media" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/>
+            <circle cx="8.5" cy="9" r="1.5" fill="currentColor"/>
+            <path d="m4 17 5-5 3.5 3.5 2.5-2.5 5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg class="nav-smart-icon nav-smart-icon--games" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M7.5 8h9a4 4 0 0 1 3.8 2.8l1 3.4a2.6 2.6 0 0 1-4.2 2.7l-2.1-1.7H9l-2.1 1.7a2.6 2.6 0 0 1-4.2-2.7l1-3.4A4 4 0 0 1 7.5 8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M7.5 10.5v4m-2-2h4m6.5-.5h.01m2 2h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <span class="nav-smart-label">Médias</span>
+        </a>
         <button class="btn-icon" id="themeToggle" aria-label="Changer le thème">
           <span class="theme-icon-light">☀️</span>
           <span class="theme-icon-dark">🌙</span>
@@ -1616,6 +1628,6 @@
     </div>
   </section>
 
-  <script src="js/script.js?v=20261127g"></script>
+  <script src="js/script.js?v=20261127h"></script>
 </body>
 </html>

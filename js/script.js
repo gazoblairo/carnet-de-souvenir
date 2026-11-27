@@ -3654,6 +3654,27 @@ function getAppCurrentSection() {
   return document.querySelector('.section.active')?.id || 'accueil';
 }
 
+function updateSmartNavigation(activeSection = getAppCurrentSection()) {
+  const link = document.getElementById('smartNavLink');
+  if (!link) return;
+
+  const destination = activeSection === 'multimedia' ? 'jeux' : 'multimedia';
+  const labelKey = destination === 'jeux' ? 'nav.smartGames' : 'nav.smartMedia';
+  const fallbackLabel = destination === 'jeux' ? 'Jeux' : 'Médias';
+  const label = link.querySelector('.nav-smart-label');
+  const text = window.I18n?.t?.(labelKey) || fallbackLabel;
+  if (!label || (link.dataset.destination === destination && label.textContent === text)) return;
+
+  link.classList.add('is-changing');
+  link.href = `#${destination}`;
+  link.dataset.section = destination;
+  link.dataset.destination = destination;
+  label.textContent = text;
+  link.setAttribute('aria-label', text);
+  link.title = text;
+  requestAnimationFrame(() => requestAnimationFrame(() => link.classList.remove('is-changing')));
+}
+
 function updateNavMenuForActiveSection() {
   const activeSection = getAppCurrentSection();
   document.querySelectorAll('#navLinks a.nav-link[data-section]').forEach(link => {
@@ -3754,6 +3775,7 @@ function setAppActiveSection(target) {
     section.classList.toggle('active', section.id === target);
   });
   updateNavMenuForActiveSection();
+  updateSmartNavigation(target);
   document.body.classList.toggle('messages-open', target === 'messages');
 
   const navLinks = document.getElementById('navLinks');
@@ -3947,6 +3969,8 @@ function initNavigation() {
   const navToggle = document.getElementById('navToggle');
   appBackSentinelActive = !!history.state?.[APP_BACK_SENTINEL_KEY];
   updateNavMenuForActiveSection();
+  updateSmartNavigation();
+  window.addEventListener('carnet:languagechange', () => updateSmartNavigation());
 
   window.addEventListener('popstate', event => {
     const player = document.getElementById('playlistPlayer');
