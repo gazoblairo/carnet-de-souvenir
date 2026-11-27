@@ -3507,10 +3507,18 @@ function initSettingsNavigation() {
 }
 
 const APP_BACK_SENTINEL_KEY = '__notreCarnetBackSentinel';
+const VINYL_FULLSCREEN_HISTORY_KEY = '__notreCarnetVinylFullscreen';
 let appBackSentinelActive = false;
 let appBackSurfaceObserver = null;
 let appLastHomeBackAt = 0;
 let appBackExitPending = false;
+let vinylImmersivePreviousHistoryState = null;
+let vinylImmersivePreviousUrl = '';
+let vinylImmersivePreviousFocus = null;
+let vinylImmersiveExitTimer = null;
+let vinylImmersiveLastPointerDownAt = 0;
+let vinylImmersiveScrollPosition = null;
+let vinylImmersivePreviousScrollOffsets = null;
 
 function getAppCurrentSection() {
   return document.querySelector('.section.active')?.id || 'accueil';
@@ -3785,6 +3793,11 @@ function handleHomeBack() {
 }
 
 function navigateBackInApp() {
+  if (document.getElementById('playlistPlayer')?.classList.contains('is-vinyl-fullscreen')) {
+    toggleVinylFullscreen(false, { instant: true });
+    syncAppBackSentinel();
+    return;
+  }
   if (closeTopmostBackSurface()) {
     appLastHomeBackAt = 0;
     syncAppBackSentinel();
@@ -3806,6 +3819,29 @@ function initNavigation() {
   updateNavMenuForActiveSection();
 
   window.addEventListener('popstate', event => {
+    const player = document.getElementById('playlistPlayer');
+    if (player?.classList.contains('is-vinyl-fullscreen')) {
+      appBackSentinelActive = !!event.state?.[APP_BACK_SENTINEL_KEY];
+      toggleVinylFullscreen(false, { instant: true });
+      if (!appBackSentinelActive) syncAppBackSentinel();
+      return;
+    }
+
+    if (event.state?.[VINYL_FULLSCREEN_HISTORY_KEY]) {
+      const restoredState = vinylImmersivePreviousHistoryState
+        && typeof vinylImmersivePreviousHistoryState === 'object'
+        ? vinylImmersivePreviousHistoryState
+        : { ...event.state };
+      if (restoredState && typeof restoredState === 'object') {
+        delete restoredState[VINYL_FULLSCREEN_HISTORY_KEY];
+      }
+      history.replaceState(restoredState, '', vinylImmersivePreviousUrl || location.href);
+      appBackSentinelActive = !!restoredState?.[APP_BACK_SENTINEL_KEY];
+      vinylImmersivePreviousHistoryState = null;
+      vinylImmersivePreviousUrl = '';
+      return;
+    }
+
     if (!appBackSentinelActive) {
       if (appBackExitPending && event.state?.[APP_BACK_SENTINEL_KEY]) {
         history.back();
@@ -5083,19 +5119,174 @@ function updateMediaSessionPosition() {
   }
 }
 
-function toggleVinylFullscreen(forceState) {
+function pushVinylFullscreenHistoryEntry() {
+  if (!window.history?.pushState) return;
+  ensureAppBackSentinel();
+  vinylImmersivePreviousHistoryState = history.state;
+  vinylImmersivePreviousUrl = location.href;
+  history.pushState(
+    { ...(history.state && typeof history.state === 'object' ? history.state : {}), [VINYL_FULLSCREEN_HISTORY_KEY]: true },
+    '',
+    location.href
+  );
+}
+
+function lockVinylImmersiveScroll() {
+  const body = document.body;
+  const root = document.documentElement;
+  vinylImmersiveScrollPosition = { x: window.scrollX, y: window.scrollY };
+  vinylImmersivePreviousScrollOffsets = {
+    top: body.style.getPropertyValue('--vinyl-immersive-scroll-top'),
+    topPriority: body.style.getPropertyPriority('--vinyl-immersive-scroll-top'),
+    left: body.style.getPropertyValue('--vinyl-immersive-scroll-left'),
+    leftPriority: body.style.getPropertyPriority('--vinyl-immersive-scroll-left')
+  };
+  body.style.setProperty('--vinyl-immersive-scroll-top', `${-vinylImmersiveScrollPosition.y}px`);
+  body.style.setProperty('--vinyl-immersive-scroll-left', `${-vinylImmersiveScrollPosition.x}px`);
+  root.classList.add('is-vinyl-immersive');
+  body.classList.add('is-vinyl-immersive');
+}
+
+function restoreVinylImmersiveScroll() {
+  const position = vinylImmersiveScrollPosition;
+  const previousOffsets = vinylImmersivePreviousScrollOffsets;
+  const body = document.body;
+  body.classList.remove('is-vinyl-immersive');
+  document.documentElement.classList.remove('is-vinyl-immersive');
+  if (previousOffsets) {
+    if (previousOffsets.top) {
+      body.style.setProperty('--vinyl-immersive-scroll-top', previousOffsets.top, previousOffsets.topPriority);
+    } else {
+      body.style.removeProperty('--vinyl-immersive-scroll-top');
+    }
+    if (previousOffsets.left) {
+      body.style.setProperty('--vinyl-immersive-scroll-left', previousOffsets.left, previousOffsets.leftPriority);
+    } else {
+      body.style.removeProperty('--vinyl-immersive-scroll-left');
+    }
+  }
+  vinylImmersiveScrollPosition = null;
+  vinylImmersivePreviousScrollOffsets = null;
+  if (position) {
+    const root = document.documentElement;
+    const previousBehavior = root.style.getPropertyValue('scroll-behavior');
+    const previousBehaviorPriority = root.style.getPropertyPriority('scroll-behavior');
+    root.style.setProperty('scroll-behavior', 'auto', 'important');
+    window.scrollTo(position.x, position.y);
+    if (previousBehavior) {
+      root.style.setProperty('scroll-behavior', previousBehavior, previousBehaviorPriority);
+    } else {
+      root.style.removeProperty('scroll-behavior');
+    }
+  }
+}
+
+function toggleVinylFullscreen(forceState, options = {}) {
   const player = document.getElementById('playlistPlayer');
   const button = document.getElementById('vinylFullscreenBtn');
   if (!player || !button) return;
 
   const isFullscreen = forceState ?? !player.classList.contains('is-vinyl-fullscreen');
-  player.classList.toggle('is-vinyl-fullscreen', isFullscreen);
+  const wasFullscreen = player.classList.contains('is-vinyl-fullscreen');
+  const body = document.body;
+
+  if (isFullscreen && !wasFullscreen) {
+    if (vinylImmersiveExitTimer !== null) {
+      window.clearTimeout(vinylImmersiveExitTimer);
+      vinylImmersiveExitTimer = null;
+    }
+    player.classList.remove('is-vinyl-immersive-exiting');
+    body.classList.remove('is-vinyl-immersive-exiting');
+    vinylImmersivePreviousFocus = document.activeElement;
+    pushVinylFullscreenHistoryEntry();
+    vinylImmersiveLastPointerDownAt = 0;
+    lockVinylImmersiveScroll();
+    player.classList.add('is-vinyl-fullscreen');
+  } else if (!isFullscreen && wasFullscreen) {
+    if (player.classList.contains('is-vinyl-immersive-exiting')) return;
+
+    button.setAttribute('aria-pressed', 'false');
+    button.textContent = '⛶';
+    const exitLabel = window.I18n?.t('media.fullscreen') || 'Mode vinyle plein écran';
+    button.setAttribute('aria-label', exitLabel);
+    button.title = exitLabel;
+
+    if (history.state?.[VINYL_FULLSCREEN_HISTORY_KEY]) {
+      history.replaceState(vinylImmersivePreviousHistoryState, '', vinylImmersivePreviousUrl || location.href);
+      vinylImmersivePreviousHistoryState = null;
+      vinylImmersivePreviousUrl = '';
+    }
+
+    const finishExit = () => {
+      vinylImmersiveExitTimer = null;
+      player.classList.remove('is-vinyl-fullscreen', 'is-vinyl-immersive-exiting');
+      body.classList.remove('is-vinyl-immersive-exiting');
+      restoreVinylImmersiveScroll();
+      if (vinylImmersivePreviousFocus instanceof HTMLElement && vinylImmersivePreviousFocus.isConnected) {
+        vinylImmersivePreviousFocus.focus({ preventScroll: true });
+      }
+      vinylImmersivePreviousFocus = null;
+    };
+
+    player.classList.add('is-vinyl-immersive-exiting');
+    body.classList.add('is-vinyl-immersive-exiting');
+    const media = document.getElementById('multimedia');
+    const motionReduced = media?.dataset.mediaAnimations === 'false'
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (options.instant || motionReduced) {
+      finishExit();
+    } else {
+      vinylImmersiveExitTimer = window.setTimeout(finishExit, 220);
+    }
+    return;
+  } else if (isFullscreen && wasFullscreen && player.classList.contains('is-vinyl-immersive-exiting')) {
+    if (vinylImmersiveExitTimer !== null) {
+      window.clearTimeout(vinylImmersiveExitTimer);
+      vinylImmersiveExitTimer = null;
+    }
+    player.classList.remove('is-vinyl-immersive-exiting');
+    body.classList.remove('is-vinyl-immersive-exiting');
+    if (!history.state?.[VINYL_FULLSCREEN_HISTORY_KEY]) pushVinylFullscreenHistoryEntry();
+  } else {
+    return;
+  }
+
   button.setAttribute('aria-pressed', String(isFullscreen));
   button.textContent = isFullscreen ? '×' : '⛶';
   const labelKey = isFullscreen ? 'media.exitFullscreen' : 'media.fullscreen';
   const label = window.I18n?.t(labelKey) || (isFullscreen ? 'Quitter le plein écran' : 'Mode vinyle plein écran');
   button.setAttribute('aria-label', label);
   button.title = label;
+}
+
+function handleVinylImmersivePointerDown(event) {
+  const player = document.getElementById('playlistPlayer');
+  if (!player?.classList.contains('is-vinyl-fullscreen') || player.classList.contains('is-vinyl-immersive-exiting')) return;
+
+  const now = performance.now();
+  if (vinylImmersiveLastPointerDownAt && now - vinylImmersiveLastPointerDownAt <= 450) {
+    vinylImmersiveLastPointerDownAt = 0;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggleVinylFullscreen(false);
+    return;
+  }
+  vinylImmersiveLastPointerDownAt = now;
+}
+
+function handleVinylImmersiveClick(event) {
+  const player = document.getElementById('playlistPlayer');
+  if (!player?.classList.contains('is-vinyl-fullscreen')) return;
+  if (player.classList.contains('is-vinyl-immersive-exiting')) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
+  if (event.detail > 1) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggleVinylFullscreen(false);
+  }
 }
 
 function updateVinylRotation(isPlaying) {
@@ -5350,6 +5541,15 @@ async function initMedia() {
   }
 
   fullscreenBtn?.addEventListener('click', () => toggleVinylFullscreen());
+  document.addEventListener('pointerdown', handleVinylImmersivePointerDown, true);
+  document.addEventListener('click', handleVinylImmersiveClick, true);
+  document.addEventListener('dblclick', event => {
+    const player = document.getElementById('playlistPlayer');
+    if (!player?.classList.contains('is-vinyl-fullscreen')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggleVinylFullscreen(false);
+  }, true);
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') toggleVinylFullscreen(false);
   });
