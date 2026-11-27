@@ -910,6 +910,10 @@ let previewPartnerAvatarUrl = null;
 let playlistTracks = [];
 let currentTrackIndex = -1;
 let currentAudio = null;
+let currentAudioObjectUrl = null;
+let artworkCacheTrackId = null;
+let artworkCacheBlob = null;
+let artworkCachePromise = null;
 let vinylRotationAnimation = null;
 let vinylDecelerationFrame = null;
 let vinylDecelerationToken = 0;
@@ -927,6 +931,7 @@ const MEDIA_SETTINGS_DEFAULTS = {
   repeat: 'all',
   playerStyle: 'signature',
   recordAnimation: true,
+  lockScreen: true,
   visualizer: true,
   playlistOrder: 'added',
   slideshowEnabled: false,
@@ -4623,7 +4628,7 @@ function getMediaPreferences() {
     ...MEDIA_SETTINGS_DEFAULTS,
     ...(stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {})
   };
-  const booleanPreferences = ['animations', 'glass', 'showFavorites', 'autoNext', 'shuffle', 'recordAnimation', 'visualizer', 'slideshowEnabled'];
+  const booleanPreferences = ['animations', 'glass', 'showFavorites', 'autoNext', 'shuffle', 'recordAnimation', 'lockScreen', 'visualizer', 'slideshowEnabled'];
   const validOptions = {
     density: ['comfortable', 'compact'],
     photoLayout: ['grid', 'mosaic'],
@@ -4660,11 +4665,15 @@ function applyMediaPreferences(preferences = getMediaPreferences()) {
   media.dataset.mediaShowFavorites = String(preferences.showFavorites);
   media.dataset.mediaPlayerStyle = preferences.playerStyle;
   media.dataset.mediaRecordAnimation = String(preferences.recordAnimation);
+  media.dataset.mediaLockScreen = String(preferences.lockScreen);
   media.dataset.mediaVisualizer = String(preferences.visualizer);
   document.documentElement.dataset.mediaPhotoEffect = preferences.photoEffect;
   document.documentElement.dataset.mediaAnimations = String(preferences.animations);
   document.documentElement.dataset.mediaGlass = String(preferences.glass);
   updateVinylRotation(Boolean(playlistTracks[currentTrackIndex] && currentAudio && !currentAudio.paused));
+  configureMediaSessionActions(preferences.lockScreen);
+  updateMediaSessionMetadata();
+  updatePlayerPlaybackState();
   const customIntervalRow = document.getElementById('galleryCustomIntervalRow');
   if (customIntervalRow) customIntervalRow.hidden = preferences.slideshowInterval !== 'custom';
 
@@ -4860,6 +4869,8 @@ async function deleteTrack(id) {
 
     if (playlistTracks.length === 0) {
       currentTrackIndex = -1;
+      if (currentAudioObjectUrl) URL.revokeObjectURL(currentAudioObjectUrl);
+      currentAudioObjectUrl = null;
       updatePlayerUI();
     } else {
       const nextIndex = trackIndex < playlistTracks.length ? trackIndex : playlistTracks.length - 1;
@@ -4882,24 +4893,37 @@ function updatePlayerUI() {
   const titleEl = document.getElementById('trackTitle');
   const artistEl = document.getElementById('trackArtist');
   const playPauseBtn = document.getElementById('playPauseBtn');
+  const artworkBtn = document.getElementById('setTrackArtworkBtn');
+  const fullscreenBtn = document.getElementById('vinylFullscreenBtn');
   const progressEl = document.getElementById('trackProgress');
   const timeEl = document.getElementById('trackTime');
   updatePlayerPlaybackState();
 
   if (!track) {
+    toggleVinylFullscreen(false);
     titleEl.textContent = window.I18n?.t('media.emptyTrack') || 'Aucune musique sélectionnée';
     artistEl.textContent = window.I18n?.t('media.addTrackHelp') || 'Ajoutez une piste pour commencer';
     playPauseBtn.textContent = '▶️';
     progressEl.value = 0;
     timeEl.textContent = '00:00 / 00:00';
+    if (artworkBtn) artworkBtn.disabled = true;
+    if (fullscreenBtn) fullscreenBtn.disabled = true;
+    updateTrackArtwork(null);
+    updateMediaSessionMetadata();
     return;
   }
 
-  titleEl.textContent = track.name;
-  artistEl.textContent = window.I18n?.t('media.playing') || 'Lecture en cours';
+  const metadata = getTrackMetadata(track);
+  titleEl.textContent = metadata.title;
+  artistEl.textContent = metadata.artist;
+  if (artworkBtn) artworkBtn.disabled = false;
+  if (fullscreenBtn) fullscreenBtn.disabled = false;
   playPauseBtn.textContent = currentAudio && !currentAudio.paused ? '⏸️' : '▶️';
   progressEl.value = 0;
   timeEl.textContent = '00:00 / 00:00';
+  updateTrackArtwork(track);
+  updateMediaSessionMetadata();
+  toggleVinylFullscreen(document.getElementById('playlistPlayer').classList.contains('is-vinyl-fullscreen'));
 }
 
 function updatePlayerPlaybackState() {
@@ -4917,6 +4941,161 @@ function updatePlayerPlaybackState() {
     || (isPlaying ? 'Mettre la piste en pause' : 'Lire la piste');
   button.setAttribute('aria-label', actionLabel);
   button.title = actionLabel;
+  const session = navigator.mediaSession;
+  if (session) {
+    session.playbackState = !getMediaPreferences().lockScreen
+      ? 'none'
+      : isPlaying ? 'playing' : playlistTracks[currentTrackIndex] ? 'paused' : 'none';
+    if (getMediaPreferences().lockScreen) updateMediaSessionPosition();
+  }
+}
+
+function getTrackMetadata(track) {
+  const filename = (track?.name || '').replace(/\.[^.]+$/, '');
+  const artistTitle = filename.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+  return {
+    title: artistTitle ? artistTitle[2] : filename,
+    artist: artistTitle ? artistTitle[1] : (window.I18n?.t('media.unknownArtist') || 'Artiste inconnu')
+  };
+}
+
+function getTrackArtworkDataUrl(track) {
+  if (!track?.artwork || !(track.artwork instanceof Blob)) return Promise.resolve(null);
+  if (artworkCacheTrackId === track.id && artworkCacheBlob === track.artwork) return artworkCachePromise;
+
+  artworkCacheTrackId = track.id;
+  artworkCacheBlob = track.artwork;
+  artworkCachePromise = new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+    reader.onerror = () => reject(reader.error || new Error('Impossible de lire la pochette.'));
+    reader.readAsDataURL(track.artwork);
+  });
+  return artworkCachePromise;
+}
+
+function updateTrackArtwork(track) {
+  const image = document.getElementById('trackArtwork');
+  const label = document.getElementById('trackLabel');
+  const cover = document.getElementById('trackCover');
+  if (!image || !label || !cover) return;
+
+  if (!track?.artwork) {
+    image.hidden = true;
+    image.removeAttribute('src');
+    label.hidden = false;
+    cover.setAttribute('aria-label', window.I18n?.t('media.trackArtworkFallback') || 'Illustration de la piste');
+    return;
+  }
+
+  getTrackArtworkDataUrl(track).then(dataUrl => {
+    if (!dataUrl || playlistTracks[currentTrackIndex] !== track) return;
+    image.src = dataUrl;
+    image.hidden = false;
+    label.hidden = true;
+    cover.setAttribute('aria-label', window.I18n?.t('media.trackArtwork') || 'Pochette de la piste');
+  }).catch(error => {
+    console.error('Erreur lors du chargement de la pochette :', error);
+    if (playlistTracks[currentTrackIndex] !== track) return;
+    image.hidden = true;
+    label.hidden = false;
+  });
+}
+
+function updateMediaSessionMetadata() {
+  const session = navigator.mediaSession;
+  if (!session) return;
+
+  const track = playlistTracks[currentTrackIndex];
+  if (!getMediaPreferences().lockScreen || !track || typeof window.MediaMetadata !== 'function') {
+    session.metadata = null;
+    return;
+  }
+
+  const details = getTrackMetadata(track);
+  const metadata = { title: details.title, artist: details.artist, album: 'Notre Carnet ❤️' };
+  session.metadata = new window.MediaMetadata(metadata);
+
+  getTrackArtworkDataUrl(track).then(artwork => {
+    if (!artwork || playlistTracks[currentTrackIndex] !== track || !getMediaPreferences().lockScreen) return;
+    session.metadata = new window.MediaMetadata({
+      ...metadata,
+      artwork: [{ src: artwork, sizes: '512x512', type: track.artwork.type || 'image/jpeg' }]
+    });
+  }).catch(error => {
+    console.error('Erreur lors de la préparation de la pochette Media Session :', error);
+  });
+}
+
+function configureMediaSessionActions(enabled) {
+  const session = navigator.mediaSession;
+  if (!session || typeof session.setActionHandler !== 'function') return;
+
+  const handlers = enabled ? {
+    play: playMediaSessionTrack,
+    pause: () => {
+      if (currentTrackIndex >= 0) getAudioPlayer().pause();
+    },
+    previoustrack: playPreviousTrack,
+    nexttrack: playNextTrack,
+    seekto: details => {
+      const audio = getAudioPlayer();
+      if (Number.isFinite(details.seekTime) && Number.isFinite(audio.duration)) {
+        audio.currentTime = Math.max(0, Math.min(audio.duration, details.seekTime));
+      }
+    }
+  } : {};
+
+  ['play', 'pause', 'previoustrack', 'nexttrack', 'seekto'].forEach(action => {
+    try {
+      session.setActionHandler(action, handlers[action] || null);
+    } catch (error) {
+      if (error.name !== 'NotSupportedError') {
+        console.error(`Impossible d’enregistrer la commande Media Session "${action}" :`, error);
+      }
+    }
+  });
+}
+
+function playMediaSessionTrack() {
+  if (currentTrackIndex < 0) {
+    playTrack(0);
+    return;
+  }
+  const audio = getAudioPlayer();
+  if (audio.paused) {
+    audio.play().catch(() => showToast(window.I18n?.t('media.playbackError') || 'Lecture impossible pour cette piste.'));
+  }
+}
+
+function updateMediaSessionPosition() {
+  const session = navigator.mediaSession;
+  const audio = currentAudio;
+  if (!session || typeof session.setPositionState !== 'function' || !audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+  try {
+    session.setPositionState({
+      duration: audio.duration,
+      playbackRate: audio.playbackRate || 1,
+      position: Math.min(audio.currentTime, audio.duration)
+    });
+  } catch (error) {
+    if (error.name !== 'TypeError') console.error('Impossible de synchroniser la position Media Session :', error);
+  }
+}
+
+function toggleVinylFullscreen(forceState) {
+  const player = document.getElementById('playlistPlayer');
+  const button = document.getElementById('vinylFullscreenBtn');
+  if (!player || !button) return;
+
+  const isFullscreen = forceState ?? !player.classList.contains('is-vinyl-fullscreen');
+  player.classList.toggle('is-vinyl-fullscreen', isFullscreen);
+  button.setAttribute('aria-pressed', String(isFullscreen));
+  button.textContent = isFullscreen ? '×' : '⛶';
+  const labelKey = isFullscreen ? 'media.exitFullscreen' : 'media.fullscreen';
+  const label = window.I18n?.t(labelKey) || (isFullscreen ? 'Quitter le plein écran' : 'Mode vinyle plein écran');
+  button.setAttribute('aria-label', label);
+  button.title = label;
 }
 
 function updateVinylRotation(isPlaying) {
@@ -4992,12 +5171,15 @@ function getAudioPlayer() {
       const progress = (currentAudio.currentTime / currentAudio.duration) * 100;
       trackProgress.value = progress;
       trackTime.textContent = `${formatMediaTime(currentAudio.currentTime)} / ${formatMediaTime(currentAudio.duration)}`;
+      updateMediaSessionPosition();
     });
     currentAudio.addEventListener('loadedmetadata', () => {
       const trackTime = document.getElementById('trackTime');
       trackTime.textContent = `00:00 / ${formatMediaTime(currentAudio.duration)}`;
       document.getElementById('playPauseBtn').textContent = '⏸️';
-      document.getElementById('trackArtist').textContent = window.I18n?.t('media.playing') || 'Lecture en cours';
+      const currentTrack = playlistTracks[currentTrackIndex];
+      if (currentTrack) document.getElementById('trackArtist').textContent = getTrackMetadata(currentTrack).artist;
+      updateMediaSessionPosition();
     });
   }
   return currentAudio;
@@ -5013,6 +5195,8 @@ async function playTrack(index) {
   const objectUrl = URL.createObjectURL(track.file);
   audio.src = objectUrl;
   audio.load();
+  if (currentAudioObjectUrl) URL.revokeObjectURL(currentAudioObjectUrl);
+  currentAudioObjectUrl = objectUrl;
   updatePlayerUI();
   await audio.play().catch(() => {
     showToast(window.I18n?.t('media.playbackError') || 'Lecture impossible pour cette piste.');
@@ -5079,6 +5263,9 @@ async function initMedia() {
   const nextTrackBtn = document.getElementById('nextTrackBtn');
   const trackProgress = document.getElementById('trackProgress');
   const favTrackBtn = document.getElementById('favTrackBtn');
+  const artworkInput = document.getElementById('trackArtworkInput');
+  const artworkBtn = document.getElementById('setTrackArtworkBtn');
+  const fullscreenBtn = document.getElementById('vinylFullscreenBtn');
 
   if (addPhotoBtn && photoInput) {
     addPhotoBtn.onclick = () => photoInput.click();
@@ -5128,6 +5315,44 @@ async function initMedia() {
   if (nextTrackBtn) {
     nextTrackBtn.addEventListener('click', playNextTrack);
   }
+
+  if (artworkBtn && artworkInput) {
+    artworkBtn.addEventListener('click', () => {
+      if (!playlistTracks[currentTrackIndex]) {
+        showToast(window.I18n?.t('media.addTrackHelp') || 'Ajoutez une piste pour commencer');
+        return;
+      }
+      artworkInput.click();
+    });
+    artworkInput.addEventListener('change', async () => {
+      const file = artworkInput.files?.[0];
+      const track = playlistTracks[currentTrackIndex];
+      if (!file || !track) return;
+      if (!file.type.startsWith('image/')) {
+        showToast(window.I18n?.t('media.invalidArtwork') || 'Choisissez un fichier image valide.');
+        artworkInput.value = '';
+        return;
+      }
+      try {
+        const updatedTrack = { ...track, artwork: file };
+        await saveAudioRecord(updatedTrack);
+        const updatedIndex = playlistTracks.findIndex(item => item.id === track.id);
+        if (updatedIndex !== -1) playlistTracks[updatedIndex] = updatedTrack;
+        artworkCacheTrackId = null;
+        if (playlistTracks[currentTrackIndex]?.id === track.id) updatePlayerUI();
+      } catch (error) {
+        console.error('Erreur lors de l’enregistrement de la pochette :', error);
+        showToast(window.I18n?.t('media.artworkError') || 'Impossible d’enregistrer cette pochette.');
+      } finally {
+        artworkInput.value = '';
+      }
+    });
+  }
+
+  fullscreenBtn?.addEventListener('click', () => toggleVinylFullscreen());
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') toggleVinylFullscreen(false);
+  });
 
   if (trackProgress) {
     trackProgress.addEventListener('input', () => {

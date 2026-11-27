@@ -42,7 +42,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
   <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=20261126o">
+  <link rel="stylesheet" href="css/style.css?v=20261127a">
 </head>
 <body>
   <div id="app">
@@ -699,6 +699,14 @@
                   <input id="mediaRecordAnimation" type="checkbox" data-media-setting="recordAnimation">
                   <span class="media-switch-track" aria-hidden="true"></span>
                 </label>
+                <label class="media-preference-row media-preference-switch" for="mediaLockScreen">
+                  <span class="media-preference-copy">
+                    <span data-i18n="mediaSettings.lockScreen">Affichage musical sur écran de verrouillage</span>
+                    <span class="media-preference-hint" data-i18n="mediaSettings.lockScreenHint">La disponibilité dépend du navigateur et d’Android.</span>
+                  </span>
+                  <input id="mediaLockScreen" type="checkbox" data-media-setting="lockScreen">
+                  <span class="media-switch-track" aria-hidden="true"></span>
+                </label>
                 <label class="media-preference-row media-preference-switch" for="mediaVisualizer">
                   <span class="media-preference-copy"><span data-i18n="mediaSettings.visualizer">Visualiseur audio</span></span>
                   <input id="mediaVisualizer" type="checkbox" data-media-setting="visualizer">
@@ -775,10 +783,12 @@
                       <button class="btn-primary" id="addTrackBtn" data-i18n="media.addTrack">+ Ajouter</button>
                     </div>
                     <input type="file" id="audioInput" accept=".mp3,.wav,.ogg,.m4a,audio/mpeg,audio/wav,audio/ogg,audio/mp4" multiple hidden>
+                    <input type="file" id="trackArtworkInput" accept="image/*" hidden>
                     <div class="playlist-player" id="playlistPlayer">
                       <div class="track-info">
                         <span id="trackCover" class="track-cover" role="img" aria-label="Illustration de la piste">
-                          <span class="track-label" aria-hidden="true">♫</span>
+                          <img id="trackArtwork" class="track-artwork" alt="" hidden>
+                          <span id="trackLabel" class="track-label" aria-hidden="true">♫</span>
                           <span class="track-spindle" aria-hidden="true"></span>
                         </span>
                         <div>
@@ -790,7 +800,9 @@
                         <button class="btn-secondary" id="prevTrackBtn" type="button" aria-label="Piste précédente" title="Piste précédente" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.previousTrack" data-i18n-title="media.previousTrack">⏮️</button>
                         <button class="btn-secondary" id="playPauseBtn" type="button" aria-label="Lire la piste" title="Lire ou mettre en pause" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.playTrack" data-i18n-title="media.playTrack">▶️</button>
                         <button class="btn-secondary" id="nextTrackBtn" type="button" aria-label="Piste suivante" title="Piste suivante" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.nextTrack" data-i18n-title="media.nextTrack">⏭️</button>
+                        <button class="btn-secondary" id="setTrackArtworkBtn" type="button" aria-label="Ajouter une pochette" title="Ajouter une pochette" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.addArtwork" data-i18n-title="media.addArtwork">🖼️</button>
                         <button class="btn-secondary" id="favTrackBtn" type="button" aria-label="Ajouter la piste aux favoris" title="Piste favorite" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.favoriteTrack" data-i18n-title="media.favoriteTrack">⭐</button>
+                        <button class="btn-secondary" id="vinylFullscreenBtn" type="button" aria-label="Ouvrir le lecteur vinyle plein écran" title="Mode vinyle plein écran" aria-pressed="false" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.fullscreen" data-i18n-title="media.fullscreen">⛶</button>
                       </div>
                       <div class="music-visualizer" aria-hidden="true">
                         <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
@@ -1544,6 +1556,6 @@
     </div>
   </section>
 
-  <script src="js/script.js?v=20261126p"></script>
+  <script src="js/script.js?v=20261127b"></script>
 </body>
 </html>
