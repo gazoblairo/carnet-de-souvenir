@@ -12,7 +12,7 @@
   <script src="supabase.js"></script>
   <script src="js/realtime.js"></script>
   <script src="js/messages.js"></script>
-  <script src="js/i18n.js?v=20261126n"></script>
+  <script src="js/i18n.js?v=20261127b"></script>
   <script src="js/app-lock.js?v=20261126f"></script>
   <script src="js/notifications.js?v=20261126f"></script>
   <script src="js/visual-customizer.js?v=20261126b"></script>
@@ -39,10 +39,11 @@
       console.warn('Theme init error', error);
     }
   </script>
-  <link rel="manifest" href="/manifest.json">
-  <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
-  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=20261127b">
+  <link rel="manifest" href="/manifest.json?v=20261127-icon1">
+  <link rel="icon" type="image/x-icon" href="/assets/icons/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css?v=20261127f">
 </head>
 <body>
   <div id="app">
@@ -669,6 +670,51 @@
                   <h3 data-i18n="mediaSettings.music">Musiques</h3>
                   <p data-i18n="mediaSettings.musicHint">Accordez le lecteur et votre playlist à vos envies.</p>
                 </div>
+                <div class="media-preference-row media-player-photo-setting">
+                  <div class="media-preference-copy">
+                    <span data-i18n="mediaSettings.playerPhoto">Photo du lecteur</span>
+                    <span class="media-preference-hint" data-i18n="mediaSettings.playerPhotoHint">Cette photo apparaîtra sur le lecteur plein écran.</span>
+                  </div>
+                  <div class="media-player-photo-controls">
+                    <div class="media-player-photo-preview">
+                      <img id="mediaPlayerPhotoPreview" alt="" hidden>
+                      <span id="mediaPlayerPhotoPlaceholder" aria-hidden="true">♫</span>
+                    </div>
+                    <div class="media-player-photo-actions">
+                      <input id="mediaPlayerPhotoInput" type="file" accept="image/*" hidden>
+                      <button class="btn-secondary btn-sm" id="mediaPlayerPhotoChoose" type="button" data-i18n="mediaSettings.choosePlayerPhoto">Choisir une photo</button>
+                      <button class="btn-primary btn-sm" id="mediaPlayerPhotoSave" type="button" data-i18n="mediaSettings.savePlayerPhoto" hidden>Valider la photo</button>
+                      <button class="btn-secondary btn-sm" id="mediaPlayerPhotoCancel" type="button" data-i18n="mediaSettings.cancelPlayerPhoto" hidden>Annuler</button>
+                      <button class="btn-secondary btn-sm" id="mediaPlayerPhotoRemove" type="button" data-i18n="mediaSettings.removePlayerPhoto" disabled>Supprimer la photo</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="media-preference-row media-player-photo-setting">
+                  <div class="media-preference-copy">
+                    <span data-i18n="mediaSettings.vinylPhoto">Photo du disque</span>
+                    <span class="media-preference-hint" data-i18n="mediaSettings.vinylPhotoHint">Cette photo apparaîtra au centre du disque vinyle.</span>
+                  </div>
+                  <div class="media-player-photo-controls">
+                    <div class="media-player-photo-preview media-vinyl-photo-preview">
+                      <img id="mediaVinylPhotoPreview" alt="" hidden>
+                      <span id="mediaVinylPhotoPlaceholder" aria-hidden="true">♫</span>
+                    </div>
+                    <div class="media-player-photo-actions">
+                      <input id="mediaVinylPhotoInput" type="file" accept="image/*" hidden>
+                      <button class="btn-secondary btn-sm" id="mediaVinylPhotoChoose" type="button" data-i18n="mediaSettings.choosePlayerPhoto">Choisir une photo</button>
+                      <button class="btn-primary btn-sm" id="mediaVinylPhotoSave" type="button" data-i18n="mediaSettings.savePlayerPhoto" hidden>Valider la photo</button>
+                      <button class="btn-secondary btn-sm" id="mediaVinylPhotoCancel" type="button" data-i18n="mediaSettings.cancelPlayerPhoto" hidden>Annuler</button>
+                      <button class="btn-secondary btn-sm" id="mediaVinylPhotoRemove" type="button" data-i18n="mediaSettings.removePlayerPhoto" disabled>Supprimer la photo</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="media-preference-row media-track-favorite-setting">
+                  <div class="media-preference-copy">
+                    <span data-i18n="mediaSettings.currentTrackFavorite">Favoris de la musique en cours</span>
+                    <span id="mediaCurrentTrackName" class="media-preference-hint" data-i18n="media.emptyTrack">Aucune musique sélectionnée</span>
+                  </div>
+                  <button class="btn-secondary btn-sm media-track-favorite-button" id="mediaCurrentTrackFavorite" type="button" aria-pressed="false" aria-label="Ajouter la piste aux favoris" data-i18n-attr="aria-label" data-i18n-aria-label="media.favoriteTrack" disabled>☆ Ajouter aux favoris</button>
+                </div>
                 <label class="media-preference-row media-preference-switch" for="mediaAutoNext">
                   <span class="media-preference-copy"><span data-i18n="mediaSettings.autoNext">Lire le morceau suivant automatiquement</span></span>
                   <input id="mediaAutoNext" type="checkbox" data-media-setting="autoNext">
@@ -783,34 +829,48 @@
                       <button class="btn-primary" id="addTrackBtn" data-i18n="media.addTrack">+ Ajouter</button>
                     </div>
                     <input type="file" id="audioInput" accept=".mp3,.wav,.ogg,.m4a,audio/mpeg,audio/wav,audio/ogg,audio/mp4" multiple hidden>
-                    <input type="file" id="trackArtworkInput" accept="image/*" hidden>
                     <div class="playlist-player" id="playlistPlayer">
+                      <div class="immersive-player-backdrop" aria-hidden="true">
+                        <img id="immersiveBackdropArtwork" alt="">
+                      </div>
                       <div class="track-info">
                         <span id="trackCover" class="track-cover" role="img" aria-label="Illustration de la piste">
                           <img id="trackArtwork" class="track-artwork" alt="" hidden>
+                          <img id="vinylCenterArtwork" class="track-artwork" alt="" hidden>
                           <span id="trackLabel" class="track-label" aria-hidden="true">♫</span>
                           <span class="track-spindle" aria-hidden="true"></span>
                         </span>
                         <div>
                           <div id="trackTitle" data-i18n="media.emptyTrack">Aucune musique sélectionnée</div>
                           <div id="trackArtist" data-i18n="media.addTrackHelp">Ajoutez une piste pour commencer</div>
+                          <div id="trackAlbum" class="track-album" data-i18n="media.albumDefault">Notre Carnet</div>
                         </div>
                       </div>
+                      <div class="immersive-artwork-frame">
+                        <img id="immersiveArtwork" alt="" hidden>
+                        <span id="immersiveArtworkPlaceholder" aria-hidden="true">♫</span>
+                      </div>
                       <div class="player-controls">
-                        <button class="btn-secondary" id="prevTrackBtn" type="button" aria-label="Piste précédente" title="Piste précédente" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.previousTrack" data-i18n-title="media.previousTrack">⏮️</button>
-                        <button class="btn-secondary" id="playPauseBtn" type="button" aria-label="Lire la piste" title="Lire ou mettre en pause" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.playTrack" data-i18n-title="media.playTrack">▶️</button>
-                        <button class="btn-secondary" id="nextTrackBtn" type="button" aria-label="Piste suivante" title="Piste suivante" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.nextTrack" data-i18n-title="media.nextTrack">⏭️</button>
-                        <button class="btn-secondary" id="setTrackArtworkBtn" type="button" aria-label="Ajouter une pochette" title="Ajouter une pochette" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.addArtwork" data-i18n-title="media.addArtwork">🖼️</button>
-                        <button class="btn-secondary" id="favTrackBtn" type="button" aria-label="Ajouter la piste aux favoris" title="Piste favorite" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.favoriteTrack" data-i18n-title="media.favoriteTrack">⭐</button>
-                        <button class="btn-secondary" id="vinylFullscreenBtn" type="button" aria-label="Ouvrir le lecteur vinyle plein écran" title="Mode vinyle plein écran" aria-pressed="false" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.fullscreen" data-i18n-title="media.fullscreen">⛶</button>
+                        <div class="immersive-transport">
+                          <button class="btn-secondary" id="prevTrackBtn" type="button" aria-label="Piste précédente" title="Piste précédente" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.previousTrack" data-i18n-title="media.previousTrack"><svg class="player-command-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h2v14H5zM19 6v12l-9-6z"></path></svg></button>
+                          <button class="btn-secondary" id="playPauseBtn" type="button" aria-label="Lire la piste" title="Lire ou mettre en pause" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.playTrack" data-i18n-title="media.playTrack"><svg class="player-command-icon player-command-icon--play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 5v14l11-7z"></path></svg><svg class="player-command-icon player-command-icon--pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"></path></svg></button>
+                          <button class="btn-secondary" id="nextTrackBtn" type="button" aria-label="Piste suivante" title="Piste suivante" data-i18n-attr="aria-label,title" data-i18n-aria-label="media.nextTrack" data-i18n-title="media.nextTrack"><svg class="player-command-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 5h-2v14h2zM5 6v12l9-6z"></path></svg></button>
+                        </div>
                       </div>
                       <div class="music-visualizer" aria-hidden="true">
                         <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
                       </div>
                       <div class="player-progress">
-                        <input type="range" id="trackProgress" value="0" min="0" max="100">
+                        <span id="trackElapsed" class="player-time" aria-hidden="true">00:00</span>
+                        <input type="range" id="trackProgress" value="0" min="0" max="100" aria-label="Position de lecture" data-i18n-attr="aria-label" data-i18n-aria-label="media.seek">
+                        <span id="trackRemaining" class="player-time" aria-hidden="true">−00:00</span>
                         <span id="trackTime">00:00 / 00:00</span>
                       </div>
+                      <label class="immersive-volume">
+                        <span aria-hidden="true">◖</span>
+                        <input type="range" id="trackVolume" min="0" max="1" step="0.01" value="1" aria-label="Volume" data-i18n-attr="aria-label" data-i18n-aria-label="media.volume">
+                        <span aria-hidden="true">◗</span>
+                      </label>
                     </div>
                     <div class="playlist-list" id="playlistList"></div>
                   </section>
@@ -1556,6 +1616,6 @@
     </div>
   </section>
 
-  <script src="js/script.js?v=20261127c"></script>
+  <script src="js/script.js?v=20261127g"></script>
 </body>
 </html>

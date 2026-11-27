@@ -1,10 +1,10 @@
-const CACHE_NAME = 'carnet-v79';
+const CACHE_NAME = 'carnet-v84';
 const ASSETS = [
   '/',
   '/index.html',
-  '/css/style.css?v=20261127b',
-  '/js/i18n.js?v=20261126n',
-  '/js/script.js?v=20261127c',
+  '/css/style.css?v=20261127f',
+  '/js/i18n.js?v=20261127b',
+  '/js/script.js?v=20261127g',
   '/js/app-lock.js?v=20261126f',
   '/js/notifications.js?v=20261126f',
   '/js/visual-customizer.js?v=20261126b',
@@ -12,12 +12,12 @@ const ASSETS = [
   '/supabase.js',
   '/js/realtime.js',
   '/js/messages.js',
-  '/manifest.json',
-  '/assets/icons/icon.svg',
-  '/assets/icons/icon-192.svg',
-  '/assets/icons/icon-512.svg',
-  '/assets/icons/icon-192.png',
-  '/assets/icons/icon-512.png',
+  '/manifest.json?v=20261127-icon1',
+  '/assets/icons/favicon.ico',
+  '/assets/icons/favicon-32.png',
+  '/assets/icons/apple-touch-icon.png',
+  '/assets/icons/app-icon-192.png',
+  '/assets/icons/app-icon-512.png',
   '/assets/images/couple.svg'
 ];
 

@@ -245,8 +245,8 @@
     const { title, body } = notificationContent(message, channel);
     const options = {
       body,
-      icon: '/assets/icons/icon-192.png',
-      badge: '/assets/icons/icon-192.png',
+      icon: '/assets/icons/app-icon-192.png',
+      badge: '/assets/icons/app-icon-192.png',
       tag: `carnet-message-${message.id}`,
       renotify: false,
       silent: true,
