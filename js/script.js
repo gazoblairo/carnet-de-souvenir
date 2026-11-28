@@ -905,8 +905,18 @@ let previewMessageBackgroundUrl = null;
 let messageBackgroundLoadId = 0;
 let messageBackgroundSelectionId = 0;
 let messageBackgroundSaving = false;
-let pendingPartnerAvatarFile = null;
-let previewPartnerAvatarUrl = null;
+let profilePhotoDialogInitialized = false;
+let profilePhotoTargets = new Map();
+let activeProfilePhotoTarget = null;
+let profilePhotoEditorImage = null;
+let profilePhotoEditorObjectUrl = null;
+let profilePhotoEditorLoadId = 0;
+let profilePhotoPickerReturnsToViewer = false;
+let profilePhotoEditorReturnsToViewer = false;
+let profilePhotoViewerZoom = 1;
+let profilePhotoEditorState = { zoom: 1, rotation: 0, offsetX: 0, offsetY: 0, shape: 'circle' };
+let profilePhotoDragState = null;
+const PROFILE_PHOTO_PREVIEW_SIZE = 720;
 let playlistTracks = [];
 let currentTrackIndex = -1;
 let currentAudio = null;
@@ -2758,95 +2768,342 @@ function bindEnterToFormSubmit(form) {
   });
 }
 
-function initMessageProfilePhotos() {
-  const avatarPrimary = document.getElementById('messageAvatarPrimary');
-  const avatarSecondary = document.getElementById('messageAvatarSecondary');
-  const partnerAvatar = document.getElementById('messagePartnerAvatar');
-  const inputPrimary = document.getElementById('messagePhotoInputPrimary');
-  const inputSecondary = document.getElementById('messagePhotoInputSecondary');
-  const previewDialog = document.getElementById('messageAvatarPreviewDialog');
-  const previewImage = document.getElementById('messageAvatarPreviewImage');
-  const cancelPreview = document.getElementById('cancelMessageAvatarPreview');
-  const confirmPhoto = document.getElementById('confirmMessageAvatarPhoto');
+function profilePhotoText(key, fallback) {
+  return window.I18n?.t(`profilePhoto.${key}`) || fallback;
+}
 
-  const applyHeaderPhoto = (role, dataUrl) => {
-    if (!dataUrl) return;
-    if (role === 'primary') {
-      saveMessageHeaderState({ photo1: dataUrl });
-      if (avatarPrimary) avatarPrimary.src = dataUrl;
-    } else {
-      saveMessageHeaderState({ photo2: dataUrl });
-      if (avatarSecondary) avatarSecondary.src = dataUrl;
-    }
-    updateMessageHeader();
-  };
+function discardProfilePhotoEditorImage() {
+  profilePhotoEditorLoadId += 1;
+  if (profilePhotoEditorObjectUrl) URL.revokeObjectURL(profilePhotoEditorObjectUrl);
+  profilePhotoEditorObjectUrl = null;
+  profilePhotoEditorImage = null;
+}
 
-  if (avatarPrimary && inputPrimary) {
-    avatarPrimary.addEventListener('click', () => inputPrimary.click());
-    inputPrimary.addEventListener('change', (event) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (e) => applyHeaderPhoto('primary', e.target.result);
-      reader.onerror = () => showToast(window.I18n?.t('profile.imageReadError') || 'Impossible de lire cette image.');
-      reader.readAsDataURL(file);
-      inputPrimary.value = '';
-    });
+function updateProfilePhotoDialogTitle(editing) {
+  const title = document.getElementById('profilePhotoDialogTitle');
+  if (title) {
+    title.textContent = editing
+      ? profilePhotoText('editTitle', 'Recadrer et ajuster')
+      : profilePhotoText('viewTitle', 'Photo de profil');
   }
+}
 
-  if ((avatarSecondary || partnerAvatar) && inputSecondary) {
-    const openPartnerPhotoPicker = () => inputSecondary.click();
-    avatarSecondary?.addEventListener('click', openPartnerPhotoPicker);
-    partnerAvatar?.addEventListener('click', openPartnerPhotoPicker);
-    partnerAvatar?.addEventListener('keydown', event => {
+function drawProfilePhotoCrop(context, size, offsetScale = 1) {
+  if (!profilePhotoEditorImage) return;
+
+  const imageWidth = profilePhotoEditorImage.naturalWidth;
+  const imageHeight = profilePhotoEditorImage.naturalHeight;
+  const radians = profilePhotoEditorState.rotation * Math.PI / 180;
+  const cosine = Math.abs(Math.cos(radians));
+  const sine = Math.abs(Math.sin(radians));
+  const rotatedWidth = imageWidth * cosine + imageHeight * sine;
+  const rotatedHeight = imageHeight * cosine + imageWidth * sine;
+  const coverScale = Math.max(size / rotatedWidth, size / rotatedHeight);
+
+  context.clearRect(0, 0, size, size);
+  context.save();
+  if (profilePhotoEditorState.shape === 'circle') {
+    context.beginPath();
+    context.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    context.clip();
+  }
+  context.translate(
+    size / 2 + profilePhotoEditorState.offsetX * offsetScale,
+    size / 2 + profilePhotoEditorState.offsetY * offsetScale
+  );
+  context.rotate(radians);
+  context.scale(coverScale * profilePhotoEditorState.zoom, coverScale * profilePhotoEditorState.zoom);
+  context.drawImage(profilePhotoEditorImage, -imageWidth / 2, -imageHeight / 2);
+  context.restore();
+}
+
+function renderProfilePhotoCrop() {
+  const canvas = document.getElementById('profilePhotoEditorCanvas');
+  const context = canvas?.getContext('2d');
+  if (!canvas || !context || !profilePhotoEditorImage) return;
+  canvas.width = PROFILE_PHOTO_PREVIEW_SIZE;
+  canvas.height = PROFILE_PHOTO_PREVIEW_SIZE;
+  drawProfilePhotoCrop(context, PROFILE_PHOTO_PREVIEW_SIZE);
+}
+
+function setProfilePhotoCropShape(shape) {
+  profilePhotoEditorState.shape = shape;
+  const stage = document.getElementById('profilePhotoEditorStage');
+  const freeButton = document.getElementById('profilePhotoCropFree');
+  const circleButton = document.getElementById('profilePhotoCropCircle');
+  stage?.classList.toggle('is-circular', shape === 'circle');
+  freeButton?.setAttribute('aria-pressed', String(shape === 'free'));
+  circleButton?.setAttribute('aria-pressed', String(shape === 'circle'));
+  renderProfilePhotoCrop();
+}
+
+function openProfilePhotoViewer(target) {
+  activeProfilePhotoTarget = target;
+  profilePhotoPickerReturnsToViewer = false;
+  profilePhotoViewerZoom = 1;
+  document.getElementById('profilePhotoViewer').hidden = false;
+  document.getElementById('profilePhotoEditor').hidden = true;
+  document.getElementById('profilePhotoDeleteConfirmation').hidden = true;
+  updateProfilePhotoDialogTitle(false);
+  const image = document.getElementById('profilePhotoViewerImage');
+  image.src = target.read();
+  image.style.transform = 'scale(1)';
+  document.getElementById('profilePhotoViewerZoomValue').textContent = '100%';
+  const dialog = document.getElementById('profilePhotoDialog');
+  if (!dialog.open) dialog.showModal();
+}
+
+function openProfilePhotoPicker(target, returnToViewer = false) {
+  const input = document.querySelector(`[data-profile-photo-input="${target.id}"]`);
+  if (!input) return;
+  activeProfilePhotoTarget = target;
+  profilePhotoPickerReturnsToViewer = returnToViewer;
+  input.click();
+}
+
+function openProfilePhotoEditor(target, source, returnToViewer = false) {
+  const loadId = ++profilePhotoEditorLoadId;
+  const objectUrl = source instanceof Blob ? URL.createObjectURL(source) : null;
+  const src = objectUrl || source;
+  if (profilePhotoEditorObjectUrl) URL.revokeObjectURL(profilePhotoEditorObjectUrl);
+  profilePhotoEditorObjectUrl = objectUrl;
+  activeProfilePhotoTarget = target;
+  profilePhotoEditorReturnsToViewer = returnToViewer;
+
+  const image = new Image();
+  image.onload = () => {
+    if (loadId !== profilePhotoEditorLoadId) return;
+    if (!image.naturalWidth || !image.naturalHeight) {
+      image.onerror();
+      return;
+    }
+    profilePhotoEditorImage = image;
+    profilePhotoEditorState = { zoom: 1, rotation: 0, offsetX: 0, offsetY: 0, shape: 'circle' };
+    document.getElementById('profilePhotoViewer').hidden = true;
+    document.getElementById('profilePhotoEditor').hidden = false;
+    document.getElementById('profilePhotoDeleteConfirmation').hidden = true;
+    document.getElementById('profilePhotoEditorZoom').value = '1';
+    setProfilePhotoCropShape('circle');
+    updateProfilePhotoDialogTitle(true);
+    const dialog = document.getElementById('profilePhotoDialog');
+    if (!dialog.open) dialog.showModal();
+    document.getElementById('profilePhotoEditorCancel').focus();
+  };
+  image.onerror = () => {
+    if (loadId !== profilePhotoEditorLoadId) return;
+    discardProfilePhotoEditorImage();
+    console.error('Impossible de décoder la photo de profil sélectionnée.');
+    showToast(profilePhotoText('readError', 'Impossible d’ouvrir cette image avec ce navigateur.'));
+  };
+  image.src = src;
+}
+
+function closeProfilePhotoDialog() {
+  const dialog = document.getElementById('profilePhotoDialog');
+  if (dialog?.open) dialog.close();
+  discardProfilePhotoEditorImage();
+  profilePhotoDragState = null;
+  profilePhotoPickerReturnsToViewer = false;
+  profilePhotoEditorReturnsToViewer = false;
+  activeProfilePhotoTarget = null;
+}
+
+function updateProfilePhotoViewerZoom(amount) {
+  profilePhotoViewerZoom = Math.max(0.5, Math.min(5, profilePhotoViewerZoom + amount));
+  document.getElementById('profilePhotoViewerImage').style.transform = `scale(${profilePhotoViewerZoom})`;
+  document.getElementById('profilePhotoViewerZoomValue').textContent = `${Math.round(profilePhotoViewerZoom * 100)}%`;
+}
+
+function updateProfilePhotoEditorZoom(value) {
+  const zoom = document.getElementById('profilePhotoEditorZoom');
+  const nextZoom = Number(value);
+  if (!zoom || !Number.isFinite(nextZoom)) return;
+  profilePhotoEditorState.zoom = Math.max(Number(zoom.min), Math.min(Number(zoom.max), nextZoom));
+  zoom.value = String(profilePhotoEditorState.zoom);
+  renderProfilePhotoCrop();
+}
+
+function initializeProfilePhotoDialog() {
+  if (profilePhotoDialogInitialized) return;
+  profilePhotoDialogInitialized = true;
+
+  const dialog = document.getElementById('profilePhotoDialog');
+  const editorStage = document.getElementById('profilePhotoEditorStage');
+  const closeButton = document.getElementById('profilePhotoClose');
+  closeButton.addEventListener('click', closeProfilePhotoDialog);
+  dialog.addEventListener('cancel', event => {
+    event.preventDefault();
+    closeProfilePhotoDialog();
+  });
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog) closeProfilePhotoDialog();
+  });
+  window.addEventListener('carnet:languagechange', () => {
+    if (dialog.open) updateProfilePhotoDialogTitle(!document.getElementById('profilePhotoEditor').hidden);
+  });
+
+  document.getElementById('profilePhotoEdit').addEventListener('click', () => {
+    if (activeProfilePhotoTarget) {
+      openProfilePhotoEditor(activeProfilePhotoTarget, activeProfilePhotoTarget.read(), true);
+    }
+  });
+  document.getElementById('profilePhotoReplace').addEventListener('click', () => {
+    if (activeProfilePhotoTarget) openProfilePhotoPicker(activeProfilePhotoTarget, true);
+  });
+  document.getElementById('profilePhotoViewerZoomOut').addEventListener('click', () => updateProfilePhotoViewerZoom(-0.2));
+  document.getElementById('profilePhotoViewerZoomIn').addEventListener('click', () => updateProfilePhotoViewerZoom(0.2));
+  document.getElementById('profilePhotoDelete').addEventListener('click', () => {
+    document.getElementById('profilePhotoDeleteConfirmation').hidden = false;
+    document.getElementById('profilePhotoDeleteCancel').focus();
+  });
+  document.getElementById('profilePhotoDeleteCancel').addEventListener('click', () => {
+    document.getElementById('profilePhotoDeleteConfirmation').hidden = true;
+    document.getElementById('profilePhotoDelete').focus();
+  });
+  document.getElementById('profilePhotoDeleteConfirm').addEventListener('click', () => {
+    if (!activeProfilePhotoTarget) return;
+    try {
+      activeProfilePhotoTarget.reset();
+      closeProfilePhotoDialog();
+      showToast(profilePhotoText('deleted', 'Photo de profil supprimée.'));
+    } catch (error) {
+      console.error('Impossible de supprimer la photo de profil.', error);
+      showToast(profilePhotoText('saveError', 'Impossible d’enregistrer cette modification.'));
+    }
+  });
+
+  document.getElementById('profilePhotoCropFree').addEventListener('click', () => setProfilePhotoCropShape('free'));
+  document.getElementById('profilePhotoCropCircle').addEventListener('click', () => setProfilePhotoCropShape('circle'));
+  document.getElementById('profilePhotoEditorZoom').addEventListener('input', event => updateProfilePhotoEditorZoom(event.target.value));
+  document.getElementById('profilePhotoEditorZoomOut').addEventListener('click', () => updateProfilePhotoEditorZoom(profilePhotoEditorState.zoom - 0.1));
+  document.getElementById('profilePhotoEditorZoomIn').addEventListener('click', () => updateProfilePhotoEditorZoom(profilePhotoEditorState.zoom + 0.1));
+  document.getElementById('profilePhotoRotateLeft').addEventListener('click', () => {
+    profilePhotoEditorState.rotation = (profilePhotoEditorState.rotation - 90 + 360) % 360;
+    renderProfilePhotoCrop();
+  });
+  document.getElementById('profilePhotoRotateRight').addEventListener('click', () => {
+    profilePhotoEditorState.rotation = (profilePhotoEditorState.rotation + 90) % 360;
+    renderProfilePhotoCrop();
+  });
+  document.getElementById('profilePhotoReset').addEventListener('click', () => {
+    profilePhotoEditorState = { zoom: 1, rotation: 0, offsetX: 0, offsetY: 0, shape: 'circle' };
+    document.getElementById('profilePhotoEditorZoom').value = '1';
+    setProfilePhotoCropShape('circle');
+  });
+  document.getElementById('profilePhotoEditorCancel').addEventListener('click', () => {
+    const returnToViewer = profilePhotoEditorReturnsToViewer;
+    const target = activeProfilePhotoTarget;
+    discardProfilePhotoEditorImage();
+    if (returnToViewer && target) openProfilePhotoViewer(target);
+    else closeProfilePhotoDialog();
+  });
+  document.getElementById('profilePhotoSave').addEventListener('click', () => {
+    if (!activeProfilePhotoTarget || !profilePhotoEditorImage) return;
+    try {
+      const size = Math.floor(Math.min(
+        PROFILE_PHOTO_PREVIEW_SIZE,
+        profilePhotoEditorImage.naturalWidth,
+        profilePhotoEditorImage.naturalHeight
+      ));
+      if (!size) throw new Error('L’image sélectionnée ne contient aucun pixel lisible.');
+      const output = document.createElement('canvas');
+      output.width = size;
+      output.height = size;
+      const context = output.getContext('2d');
+      if (!context) throw new Error('Le navigateur ne permet pas de recadrer cette image.');
+      drawProfilePhotoCrop(context, size, size / PROFILE_PHOTO_PREVIEW_SIZE);
+      const dataUrl = output.toDataURL('image/png');
+      if (dataUrl === 'data:,') throw new Error('Le navigateur ne peut pas produire un aperçu de cette résolution.');
+      const target = activeProfilePhotoTarget;
+      const returnToViewer = profilePhotoEditorReturnsToViewer;
+      target.write(dataUrl);
+      discardProfilePhotoEditorImage();
+      if (returnToViewer) openProfilePhotoViewer(target);
+      else closeProfilePhotoDialog();
+      showToast(profilePhotoText('saved', 'Photo de profil mise à jour.'));
+    } catch (error) {
+      console.error('Impossible d’enregistrer la photo de profil recadrée.', error);
+      showToast(profilePhotoText('saveError', 'Impossible d’enregistrer cette modification.'));
+    }
+  });
+
+  editorStage.addEventListener('pointerdown', event => {
+    if (!profilePhotoEditorImage || event.button !== 0) return;
+    profilePhotoDragState = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      offsetX: profilePhotoEditorState.offsetX,
+      offsetY: profilePhotoEditorState.offsetY
+    };
+    editorStage.setPointerCapture(event.pointerId);
+  });
+  editorStage.addEventListener('pointermove', event => {
+    if (!profilePhotoDragState || profilePhotoDragState.pointerId !== event.pointerId) return;
+    const bounds = editorStage.getBoundingClientRect();
+    const scaleX = PROFILE_PHOTO_PREVIEW_SIZE / bounds.width;
+    const scaleY = PROFILE_PHOTO_PREVIEW_SIZE / bounds.height;
+    profilePhotoEditorState.offsetX = profilePhotoDragState.offsetX + (event.clientX - profilePhotoDragState.x) * scaleX;
+    profilePhotoEditorState.offsetY = profilePhotoDragState.offsetY + (event.clientY - profilePhotoDragState.y) * scaleY;
+    renderProfilePhotoCrop();
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => {
+    editorStage.addEventListener(type, () => { profilePhotoDragState = null; });
+  });
+}
+
+function registerProfilePhotoTarget(target) {
+  if (profilePhotoTargets.has(target.id)) return;
+  initializeProfilePhotoDialog();
+  profilePhotoTargets.set(target.id, target);
+
+  const image = document.getElementById(target.imageId);
+  if (image) {
+    image.addEventListener('click', () => openProfilePhotoViewer(target));
+    image.addEventListener('keydown', event => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
       event.preventDefault();
-      openPartnerPhotoPicker();
+      openProfilePhotoViewer(target);
     });
-    inputSecondary.addEventListener('change', (event) => {
-      const file = event.target.files?.[0];
-      inputSecondary.value = '';
-      if (!file) return;
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-      const allowedExtensions = /\.(jpe?g|png|webp)$/i;
-      if (!allowedTypes.includes(file.type.toLowerCase()) && !allowedExtensions.test(file.name)) {
-        showToast(window.I18n?.t('profile.imageFormatError') || 'Choisissez une image JPG, JPEG, PNG ou WEBP.');
-        return;
-      }
-      if (file.size > 4 * 1024 * 1024) {
-        showToast(window.I18n?.t('profile.imageTooLarge') || 'Cette image dépasse la limite de 4 Mo.');
-        return;
-      }
-      if (previewPartnerAvatarUrl) URL.revokeObjectURL(previewPartnerAvatarUrl);
-      pendingPartnerAvatarFile = file;
-      previewPartnerAvatarUrl = URL.createObjectURL(file);
-      if (previewImage) previewImage.src = previewPartnerAvatarUrl;
-      if (previewDialog?.showModal) previewDialog.showModal();
-    });
-    const discardPreview = () => {
-      if (previewPartnerAvatarUrl) URL.revokeObjectURL(previewPartnerAvatarUrl);
-      previewPartnerAvatarUrl = null;
-      pendingPartnerAvatarFile = null;
-      if (previewImage) previewImage.removeAttribute('src');
-      if (previewDialog?.open) previewDialog.close();
-    };
-    cancelPreview?.addEventListener('click', discardPreview);
-    previewDialog?.addEventListener('cancel', event => {
-      event.preventDefault();
-      discardPreview();
-    });
-    confirmPhoto?.addEventListener('click', () => {
-      if (!pendingPartnerAvatarFile) return;
-      const reader = new FileReader();
-      reader.onload = event => {
-        applyHeaderPhoto('secondary', event.target.result);
-        discardPreview();
-        showToast(window.I18n?.t('profile.photoUpdated') || 'Photo de profil mise à jour sur cet appareil.');
-      };
-      reader.onerror = () => showToast(window.I18n?.t('profile.imageReadError') || 'Impossible de lire cette image.');
-      reader.readAsDataURL(pendingPartnerAvatarFile);
-    });
+    if (target.id.startsWith('home-')) {
+      image.addEventListener('error', () => {
+        image.src = createPlaceholderSVG('💕');
+      });
+    }
   }
+
+  document.querySelectorAll(`[data-profile-photo-picker="${target.id}"]`).forEach(button => {
+    button.addEventListener('click', () => openProfilePhotoPicker(target));
+  });
+  document.querySelectorAll(`[data-profile-photo-input="${target.id}"]`).forEach(input => {
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      input.value = '';
+      if (!file) {
+        profilePhotoPickerReturnsToViewer = false;
+        return;
+      }
+      const returnToViewer = profilePhotoPickerReturnsToViewer && activeProfilePhotoTarget?.id === target.id;
+      profilePhotoPickerReturnsToViewer = false;
+      openProfilePhotoEditor(target, file, returnToViewer);
+    });
+  });
+}
+
+function initMessageProfilePhotos() {
+  registerProfilePhotoTarget({
+    id: 'messages-partner',
+    imageId: 'messagePartnerAvatar',
+    read: () => getMessageHeaderState().photo2,
+    write: dataUrl => {
+      saveMessageHeaderState({ photo2: dataUrl });
+      updateMessageHeader();
+    },
+    reset: () => {
+      saveMessageHeaderState({ photo2: DEFAULT_SETTINGS.photo2 });
+      updateMessageHeader();
+    }
+  });
 }
 
 async function initMessages() {
@@ -3403,103 +3660,38 @@ function initDateModal() {
 /* ===== Couple Photo ===== */
 
 function initCouplePhoto() {
-  const heroPhoto1 = document.getElementById('partnerPhoto1');
-  const heroPhoto2 = document.getElementById('partnerPhoto2');
-  const editPhotoBtn = document.getElementById('editPhotoBtn');
-  const editPhotoBtn2 = document.getElementById('editPhotoBtn2');
-  const photoInput1 = document.getElementById('photoInput1');
-  const photoInput2 = document.getElementById('photoInput2');
-  const settingsPhotoBtn1 = document.getElementById('settingsPhotoBtn1');
-  const settingsPhotoBtn2 = document.getElementById('settingsPhotoBtn2');
-  const settingsPhotoInput1 = document.getElementById('settingsPhotoInput1');
-  const settingsPhotoInput2 = document.getElementById('settingsPhotoInput2');
-
-  const updatePhoto = (file, role) => {
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target.result;
+  registerProfilePhotoTarget({
+    id: 'home-first',
+    imageId: 'partnerPhoto1',
+    read: () => {
       const settings = getSettings();
-      const updatedSettings = role === 'first'
-        ? { ...settings, photo1: dataUrl }
-        : { ...settings, photo2: dataUrl };
-
-      if (role === 'first') {
-        settingsPhotoDataUrl1 = dataUrl;
-      } else {
-        settingsPhotoDataUrl2 = dataUrl;
-      }
-
-      save(STORAGE_KEYS.settings, updatedSettings);
-      renderCoupleInfo(updatedSettings);
-      showToast(window.I18n?.t(role === 'first' ? 'profile.firstPhotoUpdated' : 'profile.secondPhotoUpdated'));
-    };
-    reader.onerror = () => {
-      showToast(window.I18n?.t('profile.photoReadError') || 'Impossible de lire cette image. Veuillez choisir un autre fichier.');
-    };
-    reader.readAsDataURL(file);
-  };
-
-  if (editPhotoBtn && photoInput1) {
-    editPhotoBtn.addEventListener('click', () => photoInput1.click());
-  }
-
-  if (editPhotoBtn2 && photoInput2) {
-    editPhotoBtn2.addEventListener('click', () => photoInput2.click());
-  }
-
-  if (settingsPhotoBtn1 && settingsPhotoInput1) {
-    settingsPhotoBtn1.addEventListener('click', () => settingsPhotoInput1.click());
-  }
-
-  if (settingsPhotoBtn2 && settingsPhotoInput2) {
-    settingsPhotoBtn2.addEventListener('click', () => settingsPhotoInput2.click());
-  }
-
-  if (photoInput1) {
-    photoInput1.addEventListener('change', (event) => {
-      const file = event.target.files?.[0];
-      updatePhoto(file, 'first');
-      photoInput1.value = '';
-    });
-  }
-
-  if (photoInput2) {
-    photoInput2.addEventListener('change', (event) => {
-      const file = event.target.files?.[0];
-      updatePhoto(file, 'second');
-      photoInput2.value = '';
-    });
-  }
-
-  if (settingsPhotoInput1) {
-    settingsPhotoInput1.addEventListener('change', (event) => {
-      const file = event.target.files?.[0];
-      updatePhoto(file, 'first');
-      settingsPhotoInput1.value = '';
-    });
-  }
-
-  if (settingsPhotoInput2) {
-    settingsPhotoInput2.addEventListener('change', (event) => {
-      const file = event.target.files?.[0];
-      updatePhoto(file, 'second');
-      settingsPhotoInput2.value = '';
-    });
-  }
-
-  if (heroPhoto1) {
-    heroPhoto1.addEventListener('error', () => {
-      heroPhoto1.src = createPlaceholderSVG('💕');
-    });
-  }
-
-  if (heroPhoto2) {
-    heroPhoto2.addEventListener('error', () => {
-      heroPhoto2.src = createPlaceholderSVG('💕');
-    });
-  }
+      return settings.photo1 || settings.couplePhoto || DEFAULT_SETTINGS.photo1;
+    },
+    write: dataUrl => {
+      saveSettings({ photo1: dataUrl });
+      renderCoupleInfo(getSettings());
+    },
+    reset: () => {
+      saveSettings({ photo1: DEFAULT_SETTINGS.photo1 });
+      renderCoupleInfo(getSettings());
+    }
+  });
+  registerProfilePhotoTarget({
+    id: 'home-second',
+    imageId: 'partnerPhoto2',
+    read: () => {
+      const settings = getSettings();
+      return settings.photo2 || settings.couplePhoto || DEFAULT_SETTINGS.photo2;
+    },
+    write: dataUrl => {
+      saveSettings({ photo2: dataUrl });
+      renderCoupleInfo(getSettings());
+    },
+    reset: () => {
+      saveSettings({ photo2: DEFAULT_SETTINGS.photo2 });
+      renderCoupleInfo(getSettings());
+    }
+  });
 }
 
 function createPlaceholderSVG(emoji) {
@@ -3733,8 +3925,8 @@ function closeTopmostBackSurface() {
   if (!surface) return false;
 
   if (surface.type === 'dialog') {
-    if (surface.element.id === 'messageAvatarPreviewDialog') {
-      document.getElementById('cancelMessageAvatarPreview')?.click();
+    if (surface.element.id === 'profilePhotoDialog') {
+      closeProfilePhotoDialog();
     } else {
       surface.element.close();
     }
@@ -4336,6 +4528,9 @@ function initMemories() {
 
 /* ===== Gallery ===== */
 
+const GALLERY_IMPORT_SAVE_BATCH_SIZE = 5;
+let galleryImportInProgress = false;
+
 function getGallery() {
   return load(STORAGE_KEYS.gallery, []);
 }
@@ -4644,6 +4839,98 @@ function showGalleryInfo(photoId) {
   dialog.showModal();
 }
 
+function readGalleryFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error(`Le fichier ${file.name} n’a pas pu être lu comme une image.`));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.onerror = () => reject(reader.error || new Error(`Impossible de lire le fichier ${file.name}.`));
+    reader.onabort = () => reject(new Error(`La lecture du fichier ${file.name} a été interrompue.`));
+    reader.readAsDataURL(file);
+  });
+}
+
+function updateGalleryImportProgress(current, total) {
+  const progress = document.getElementById('galleryImportProgress');
+  const bar = document.getElementById('galleryImportProgressBar');
+  const text = document.getElementById('galleryImportProgressText');
+  if (!progress || !bar || !text) return;
+
+  progress.hidden = false;
+  bar.max = total;
+  bar.value = current;
+  text.textContent = window.I18n?.t('gallery.importProgress', { current, total })
+    || `Importation des images : ${current} / ${total}`;
+}
+
+async function importGalleryFiles(files, input, addPhotoButton) {
+  if (!files.length || galleryImportInProgress) return;
+  galleryImportInProgress = true;
+  input.value = '';
+  if (addPhotoButton) addPhotoButton.disabled = true;
+  updateGalleryImportProgress(0, files.length);
+
+  const originalPhotos = getGallery();
+  const photos = originalPhotos.slice();
+  let savedPhotoCount = 0;
+  let pendingBatchCount = 0;
+  let failedCount = 0;
+  let storageError = null;
+
+  try {
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
+      try {
+        const src = await readGalleryFile(file);
+        photos.push({ id: generateId(), src, name: file.name, added: Date.now() });
+        pendingBatchCount += 1;
+      } catch (error) {
+        failedCount += 1;
+        console.error(`Erreur lors de la lecture de l’image ${file.name} :`, error);
+      }
+
+      updateGalleryImportProgress(index + 1, files.length);
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      if (pendingBatchCount >= GALLERY_IMPORT_SAVE_BATCH_SIZE || index === files.length - 1) {
+        if (!pendingBatchCount) continue;
+        try {
+          saveGallery(photos);
+          savedPhotoCount = photos.length - originalPhotos.length;
+          pendingBatchCount = 0;
+        } catch (error) {
+          console.error('Erreur lors de l’enregistrement des images de la galerie :', error);
+          photos.length = originalPhotos.length + savedPhotoCount;
+          storageError = error;
+          break;
+        }
+      }
+    }
+
+    renderGallery();
+    if (storageError) {
+      showToast(window.I18n?.t('gallery.importStorageError', { count: savedPhotoCount })
+        || `Import arrêté : stockage indisponible. ${savedPhotoCount} image(s) enregistrée(s).`);
+    } else if (failedCount) {
+      showToast(window.I18n?.t('gallery.importSummary', { count: savedPhotoCount, failed: failedCount })
+        || `${savedPhotoCount} image(s) ajoutée(s), ${failedCount} impossible(s) à lire.`);
+    } else if (savedPhotoCount) {
+      showToast(window.I18n?.t('gallery.photosAdded', { count: savedPhotoCount })
+        || `${savedPhotoCount} photo${savedPhotoCount > 1 ? 's' : ''} ajoutée${savedPhotoCount > 1 ? 's' : ''} 🖼️`);
+    }
+  } finally {
+    galleryImportInProgress = false;
+    if (addPhotoButton) addPhotoButton.disabled = false;
+    const progress = document.getElementById('galleryImportProgress');
+    if (progress) progress.hidden = true;
+  }
+}
+
 async function shareGalleryPhoto(photoId) {
   const photo = getGallery().find(item => item.id === photoId);
   if (!photo) return;
@@ -4705,29 +4992,11 @@ function performGalleryAction(action) {
 
 function initGallery() {
   const input = document.getElementById('galleryInput');
+  const addPhotoButton = document.getElementById('addPhotoBtn');
 
   input.addEventListener('change', () => {
-    const files = Array.from(input.files);
-    if (files.length === 0) return;
-
-    let photos = getGallery();
-    let loaded = 0;
-
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        photos.push({ id: generateId(), src: e.target.result, added: Date.now() });
-        loaded++;
-        if (loaded === files.length) {
-          saveGallery(photos);
-          renderGallery();
-          showToast(window.I18n?.t('gallery.photosAdded', { count: files.length }) || `${files.length} photo${files.length > 1 ? 's' : ''} ajoutée${files.length > 1 ? 's' : ''} 🖼️`);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-
-    input.value = '';
+    const files = Array.from(input.files || []);
+    if (files.length) void importGalleryFiles(files, input, addPhotoButton);
   });
 
   document.getElementById('lightboxClose').addEventListener('click', closeLightbox);

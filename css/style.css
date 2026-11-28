@@ -1852,7 +1852,13 @@ body::after {
   border: 3px solid rgba(255,255,255,0.95);
   box-shadow: inset 0 0 0 3px rgba(255,255,255,0.16);
   display: block;
+  cursor: pointer;
   transition: transform var(--transition), filter var(--transition);
+}
+
+.profile-photo-card .hero-photo:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 68%, white 32%);
+  outline-offset: 5px;
 }
 
 .profile-photo-card:hover .hero-photo {
@@ -3621,6 +3627,25 @@ body::after {
   margin-top: 0.25rem;
   color: var(--text-muted);
   font-size: 0.88rem;
+}
+
+#multimedia .gallery-import-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+#multimedia .gallery-import-progress[hidden] {
+  display: none;
+}
+
+#multimedia .gallery-import-progress progress {
+  width: 100%;
+  accent-color: var(--primary);
 }
 
 #multimedia .section-header {
@@ -8700,61 +8725,258 @@ body.messages-open .navbar {
   }
 }
 
-#messages .message-avatar-preview-dialog {
-  width: min(390px, calc(100vw - 2rem));
-  max-width: calc(100vw - 2rem);
-  padding: 1.2rem;
-  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
-  border-radius: 20px;
+.profile-photo-dialog {
+  width: min(760px, calc(100vw - 1.5rem));
+  max-width: calc(100vw - 1.5rem);
+  max-height: min(94dvh, 900px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 28px;
   background: color-mix(in srgb, var(--bg-card) 94%, transparent);
   color: var(--text);
-  box-shadow: 0 24px 70px rgba(20, 12, 30, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  box-shadow: 0 28px 90px rgba(20, 12, 30, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
 }
 
-#messages .message-avatar-preview-dialog::backdrop {
-  background: rgba(15, 10, 22, 0.55);
-  backdrop-filter: blur(5px);
+.profile-photo-dialog::backdrop {
+  background: rgba(15, 10, 22, 0.62);
+  backdrop-filter: blur(6px);
 }
 
-#messages .message-avatar-preview-dialog h3 {
-  margin: 0 0 1rem;
+.profile-photo-dialog-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: min(94dvh, 900px);
+}
+
+.profile-photo-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.profile-photo-dialog-header h2 {
+  margin: 0;
   color: var(--text);
-  font-size: 1rem;
+  font-size: 1.08rem;
+}
+
+.profile-photo-close {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg-card) 84%, var(--primary) 16%);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1.5rem;
+}
+
+.profile-photo-viewer,
+.profile-photo-editor {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  overflow: auto;
+}
+
+.profile-photo-viewer[hidden],
+.profile-photo-editor[hidden],
+.profile-photo-delete-confirmation[hidden] {
+  display: none;
+}
+
+.profile-photo-viewer-stage {
+  display: grid;
+  width: min(100%, 460px);
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: 24px;
+  background-color: color-mix(in srgb, var(--bg-card) 84%, var(--primary) 16%);
+  background-image: linear-gradient(45deg, rgba(125, 108, 139, 0.08) 25%, transparent 25%, transparent 75%, rgba(125, 108, 139, 0.08) 75%), linear-gradient(45deg, rgba(125, 108, 139, 0.08) 25%, transparent 25%, transparent 75%, rgba(125, 108, 139, 0.08) 75%);
+  background-position: 0 0, 10px 10px;
+  background-size: 20px 20px;
+  box-shadow: 0 20px 46px rgba(28, 16, 40, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.profile-photo-viewer-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 180ms ease;
+}
+
+.profile-photo-zoom-actions,
+.profile-photo-viewer-actions,
+.profile-photo-delete-actions,
+.profile-photo-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.profile-photo-zoom-actions button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.35rem 0.8rem;
+  font-size: 1.1rem;
+}
+
+.profile-photo-zoom-actions span {
+  min-width: 4.5rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
-#messages .message-avatar-preview-dialog > img {
-  display: block;
-  width: min(220px, 62vw);
-  aspect-ratio: 1;
-  margin: 0 auto 1.2rem;
-  border: 3px solid color-mix(in srgb, var(--primary) 72%, white 28%);
-  border-radius: 50%;
-  object-fit: cover;
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--primary) 12%, transparent), 0 10px 28px rgba(20, 12, 30, 0.25);
-}
-
-#messages .message-avatar-preview-actions {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-}
-
-#messages .message-avatar-preview-actions button {
+.profile-photo-viewer-actions button,
+.profile-photo-editor-actions button,
+.profile-photo-delete-actions button {
   min-height: 44px;
 }
 
-@media (max-width: 480px) {
-  #messages .message-avatar-preview-dialog {
-    padding: 1rem;
-    border-radius: 17px;
+.profile-photo-delete-button {
+  border-color: color-mix(in srgb, #d9556f 48%, var(--border));
+  color: color-mix(in srgb, #d9556f 82%, var(--text));
+}
+
+.profile-photo-delete-confirmation {
+  width: min(100%, 460px);
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, #d9556f 30%, var(--border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg-card) 90%, #d9556f 10%);
+  text-align: center;
+}
+
+.profile-photo-delete-confirmation p {
+  margin: 0 0 0.8rem;
+}
+
+.profile-photo-editor-stage {
+  width: min(100%, min(58dvh, 540px));
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--primary) 65%, var(--secondary));
+  border-radius: 24px;
+  background-color: color-mix(in srgb, var(--bg-card) 82%, var(--primary) 18%);
+  background-image: linear-gradient(45deg, rgba(125, 108, 139, 0.1) 25%, transparent 25%, transparent 75%, rgba(125, 108, 139, 0.1) 75%), linear-gradient(45deg, rgba(125, 108, 139, 0.1) 25%, transparent 25%, transparent 75%, rgba(125, 108, 139, 0.1) 75%);
+  background-position: 0 0, 10px 10px;
+  background-size: 20px 20px;
+  box-shadow: 0 14px 36px rgba(24, 14, 36, 0.2);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.profile-photo-editor-stage:active {
+  cursor: grabbing;
+}
+
+.profile-photo-editor-stage.is-circular {
+  border-radius: 50%;
+}
+
+.profile-photo-editor-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.profile-photo-editor-hint {
+  margin: -0.3rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.profile-photo-editor-controls {
+  display: grid;
+  width: min(100%, 580px);
+  gap: 0.75rem;
+}
+
+.profile-photo-shape-actions,
+.profile-photo-zoom-control,
+.profile-photo-transform-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.profile-photo-shape-actions button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--primary) 62%, var(--border));
+  background: color-mix(in srgb, var(--primary) 18%, var(--bg-card));
+  color: var(--text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.profile-photo-zoom-control {
+  display: grid;
+  grid-template-columns: 44px minmax(120px, 1fr) 44px;
+}
+
+.profile-photo-zoom-control button {
+  min-height: 44px;
+}
+
+.profile-photo-zoom-control input {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+@media (max-width: 520px) {
+  .profile-photo-dialog {
+    width: calc(100vw - 1rem);
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+    border-radius: 21px;
   }
 
-  #messages .message-avatar-preview-actions button {
-    flex: 1 1 100%;
+  .profile-photo-dialog-shell {
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .profile-photo-dialog-header {
+    padding: 0.75rem 0.9rem;
+  }
+
+  .profile-photo-viewer,
+  .profile-photo-editor {
+    gap: 0.75rem;
+    padding: 0.8rem;
+  }
+
+  .profile-photo-editor-stage {
+    width: min(100%, 52dvh);
+  }
+
+  .profile-photo-viewer-actions button,
+  .profile-photo-editor-actions button,
+  .profile-photo-delete-actions button {
+    flex: 1 1 42%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-photo-viewer-stage img {
+    transition: none;
   }
 }
 

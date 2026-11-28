@@ -12,7 +12,7 @@
   <script src="supabase.js"></script>
   <script src="js/realtime.js"></script>
   <script src="js/messages.js"></script>
-  <script src="js/i18n.js?v=20261127c"></script>
+  <script src="js/i18n.js?v=20261128b"></script>
   <script src="js/app-lock.js?v=20261126f"></script>
   <script src="js/notifications.js?v=20261126f"></script>
   <script src="js/visual-customizer.js?v=20261126b"></script>
@@ -43,7 +43,7 @@
   <link rel="icon" type="image/x-icon" href="/assets/icons/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=20261127m">
+  <link rel="stylesheet" href="css/style.css?v=20261128b">
 </head>
 <body>
   <div id="app">
@@ -98,17 +98,17 @@
           <div class="hero-portrait" aria-label="Photos du couple">
             <div class="profile-photo-stack">
               <div class="profile-photo-card profile-photo-card--first">
-                <img id="partnerPhoto1" src="assets/images/couple.svg" alt="Photo du premier partenaire" class="hero-photo">
-                <button class="profile-photo-edit" id="editPhotoBtn" type="button" title="Modifier la photo du premier partenaire">📷</button>
+                <img id="partnerPhoto1" src="assets/images/couple.svg" alt="Photo de profil" class="hero-photo" data-profile-photo-target="home-first" role="button" tabindex="0" aria-label="Ouvrir la photo de profil" title="Ouvrir la photo de profil" data-i18n-attr="alt,aria-label,title" data-i18n-alt="profilePhoto.photoAlt" data-i18n-aria-label="profilePhoto.open" data-i18n-title="profilePhoto.open">
+                <button class="profile-photo-edit" id="editPhotoBtn" type="button" title="Remplacer la photo du premier partenaire" aria-label="Remplacer la photo du premier partenaire" data-profile-photo-picker="home-first" data-i18n-attr="title,aria-label" data-i18n-title="profilePhoto.replace" data-i18n-aria-label="profilePhoto.replace">📷</button>
               </div>
               <div class="profile-photo-card profile-photo-card--second">
-                <img id="partnerPhoto2" src="assets/images/couple.svg" alt="Photo du second partenaire" class="hero-photo">
-                <button class="profile-photo-edit profile-photo-edit--secondary" id="editPhotoBtn2" type="button" title="Modifier la photo du second partenaire">📷</button>
+                <img id="partnerPhoto2" src="assets/images/couple.svg" alt="Photo de profil" class="hero-photo" data-profile-photo-target="home-second" role="button" tabindex="0" aria-label="Ouvrir la photo de profil" title="Ouvrir la photo de profil" data-i18n-attr="alt,aria-label,title" data-i18n-alt="profilePhoto.photoAlt" data-i18n-aria-label="profilePhoto.open" data-i18n-title="profilePhoto.open">
+                <button class="profile-photo-edit profile-photo-edit--secondary" id="editPhotoBtn2" type="button" title="Remplacer la photo du second partenaire" aria-label="Remplacer la photo du second partenaire" data-profile-photo-picker="home-second" data-i18n-attr="title,aria-label" data-i18n-title="profilePhoto.replace" data-i18n-aria-label="profilePhoto.replace">📷</button>
               </div>
               <span class="profile-heart-badge" aria-hidden="true">❤️</span>
             </div>
-            <input type="file" id="photoInput1" accept="image/*" hidden>
-            <input type="file" id="photoInput2" accept="image/*" hidden>
+            <input type="file" id="photoInput1" accept="image/*" data-profile-photo-input="home-first" hidden>
+            <input type="file" id="photoInput2" accept="image/*" data-profile-photo-input="home-second" hidden>
           </div>
           <div class="hero-content">
             <div class="hero-badge" data-i18n="home.story">Notre histoire</div>
@@ -187,16 +187,8 @@
         <div class="messages-v2-shell">
           <header class="messages-chat-header">
             <button class="messages-back-button" id="messagesBackBtn" type="button" aria-label="Retour à l’accueil" data-i18n-attr="aria-label" data-i18n-aria-label="chat.backToHome">‹</button>
-            <img id="messagePartnerAvatar" class="messages-chat-avatar" src="assets/images/couple.svg" alt="Photo de profil du partenaire" role="button" tabindex="0" aria-label="Modifier la photo de profil du partenaire" title="Modifier la photo de profil" data-i18n-attr="alt,aria-label,title" data-i18n-alt="chat.avatarAlt" data-i18n-aria-label="chat.editPartnerPhoto" data-i18n-title="chat.editPartnerPhotoTitle">
-            <input id="messagePhotoInputSecondary" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden>
-            <dialog class="message-avatar-preview-dialog" id="messageAvatarPreviewDialog" aria-labelledby="messageAvatarPreviewTitle">
-              <h3 id="messageAvatarPreviewTitle" data-i18n="chat.photoPreviewTitle">Aperçu de la photo</h3>
-              <img id="messageAvatarPreviewImage" alt="Aperçu de la photo sélectionnée" data-i18n-attr="alt" data-i18n-alt="chat.selectedPhotoAlt">
-              <div class="message-avatar-preview-actions">
-                <button class="btn-secondary" id="cancelMessageAvatarPreview" type="button" data-i18n="modal.cancel">Annuler</button>
-                <button class="btn-primary" id="confirmMessageAvatarPhoto" type="button" data-i18n="chat.usePhoto">Utiliser cette photo</button>
-              </div>
-            </dialog>
+            <img id="messagePartnerAvatar" class="messages-chat-avatar" src="assets/images/couple.svg" alt="Photo de profil" role="button" tabindex="0" aria-label="Ouvrir la photo de profil" title="Ouvrir la photo de profil" data-profile-photo-target="messages-partner" data-i18n-attr="alt,aria-label,title" data-i18n-alt="profilePhoto.photoAlt" data-i18n-aria-label="profilePhoto.open" data-i18n-title="profilePhoto.open">
+            <input id="messagePhotoInputSecondary" type="file" accept="image/*" data-profile-photo-input="messages-partner" hidden>
             <div class="messages-chat-identity" role="button" tabindex="0" aria-label="Ouvrir les paramètres de la conversation" data-i18n-attr="aria-label" data-i18n-aria-label="chat.settingsOpen" aria-haspopup="dialog" aria-controls="messagesSettingsPanel">
               <h2 id="messagesPartnerName" data-i18n="chat.partnerFallback">Votre moitié</h2>
             </div>
@@ -801,6 +793,10 @@
                     </div>
                   </div>
                   <input type="file" id="galleryInput" accept="image/*" multiple hidden>
+                  <div class="gallery-import-progress" id="galleryImportProgress" role="status" aria-live="polite" hidden>
+                    <progress id="galleryImportProgressBar" value="0" max="1"></progress>
+                    <span id="galleryImportProgressText"></span>
+                  </div>
                   <div class="gallery-grid" id="galleryGrid"></div>
                   <div class="empty-state" id="galleryEmpty" hidden>
                     <span class="empty-icon">🖼️</span>
@@ -1599,6 +1595,63 @@
       </div>
     </dialog>
 
+    <dialog class="profile-photo-dialog" id="profilePhotoDialog" aria-labelledby="profilePhotoDialogTitle">
+      <div class="profile-photo-dialog-shell">
+        <header class="profile-photo-dialog-header">
+          <h2 id="profilePhotoDialogTitle" data-i18n="profilePhoto.viewTitle">Photo de profil</h2>
+          <button type="button" class="profile-photo-close" id="profilePhotoClose" aria-label="Fermer" data-i18n-attr="aria-label" data-i18n-aria-label="modal.close">×</button>
+        </header>
+        <section class="profile-photo-viewer" id="profilePhotoViewer">
+          <div class="profile-photo-viewer-stage">
+            <img id="profilePhotoViewerImage" alt="Photo de profil agrandie" data-i18n-attr="alt" data-i18n-alt="profilePhoto.photoAlt">
+          </div>
+          <div class="profile-photo-zoom-actions">
+            <button type="button" class="btn-secondary" id="profilePhotoViewerZoomOut" aria-label="Réduire" data-i18n-attr="aria-label" data-i18n-aria-label="profilePhoto.zoomOut">−</button>
+            <span id="profilePhotoViewerZoomValue" aria-live="polite">100%</span>
+            <button type="button" class="btn-secondary" id="profilePhotoViewerZoomIn" aria-label="Agrandir" data-i18n-attr="aria-label" data-i18n-aria-label="profilePhoto.zoomIn">+</button>
+          </div>
+          <div class="profile-photo-viewer-actions">
+            <button type="button" class="btn-primary" id="profilePhotoEdit" data-i18n="profilePhoto.edit">Recadrer et ajuster</button>
+            <button type="button" class="btn-secondary" id="profilePhotoReplace" data-i18n="profilePhoto.replace">Remplacer</button>
+            <button type="button" class="btn-secondary profile-photo-delete-button" id="profilePhotoDelete" data-i18n="profilePhoto.delete">Supprimer</button>
+          </div>
+          <div class="profile-photo-delete-confirmation" id="profilePhotoDeleteConfirmation" hidden>
+            <p data-i18n="profilePhoto.confirmDelete">Supprimer cette photo de profil ?</p>
+            <div class="profile-photo-delete-actions">
+              <button type="button" class="btn-secondary" id="profilePhotoDeleteCancel" data-i18n="modal.cancel">Annuler</button>
+              <button type="button" class="btn-secondary profile-photo-delete-button" id="profilePhotoDeleteConfirm" data-i18n="profilePhoto.delete">Supprimer</button>
+            </div>
+          </div>
+        </section>
+        <section class="profile-photo-editor" id="profilePhotoEditor" hidden>
+          <div class="profile-photo-editor-stage" id="profilePhotoEditorStage">
+            <canvas id="profilePhotoEditorCanvas" aria-label="Aperçu du recadrage" data-i18n-attr="aria-label" data-i18n-aria-label="profilePhoto.cropPreview"></canvas>
+          </div>
+          <p class="profile-photo-editor-hint" data-i18n="profilePhoto.dragHint">Faites glisser l’image pour la déplacer.</p>
+          <div class="profile-photo-editor-controls">
+            <div class="profile-photo-shape-actions" role="group" aria-label="Forme du recadrage" data-i18n-attr="aria-label" data-i18n-aria-label="profilePhoto.cropShape">
+              <button type="button" class="btn-secondary" id="profilePhotoCropFree" aria-pressed="false" data-i18n="profilePhoto.cropFree">Libre</button>
+              <button type="button" class="btn-secondary" id="profilePhotoCropCircle" aria-pressed="true" data-i18n="profilePhoto.cropCircle">Circulaire</button>
+            </div>
+            <div class="profile-photo-zoom-control">
+              <button type="button" class="btn-secondary" id="profilePhotoEditorZoomOut" aria-label="Réduire" data-i18n-attr="aria-label" data-i18n-aria-label="profilePhoto.zoomOut">−</button>
+              <input type="range" id="profilePhotoEditorZoom" min="0.25" max="5" step="0.01" value="1" aria-label="Zoom de l’image" data-i18n-attr="aria-label" data-i18n-aria-label="profilePhoto.zoom">
+              <button type="button" class="btn-secondary" id="profilePhotoEditorZoomIn" aria-label="Agrandir" data-i18n-attr="aria-label" data-i18n-aria-label="profilePhoto.zoomIn">+</button>
+            </div>
+            <div class="profile-photo-transform-actions">
+              <button type="button" class="btn-secondary" id="profilePhotoRotateLeft" data-i18n="profilePhoto.rotateLeft">↶ Rotation à gauche</button>
+              <button type="button" class="btn-secondary" id="profilePhotoRotateRight" data-i18n="profilePhoto.rotateRight">↷ Rotation à droite</button>
+              <button type="button" class="btn-secondary" id="profilePhotoReset" data-i18n="profilePhoto.reset">Réinitialiser</button>
+            </div>
+          </div>
+          <div class="profile-photo-editor-actions">
+            <button type="button" class="btn-secondary" id="profilePhotoEditorCancel" data-i18n="modal.cancel">Annuler</button>
+            <button type="button" class="btn-primary" id="profilePhotoSave" data-i18n="modal.save">Enregistrer</button>
+          </div>
+        </section>
+      </div>
+    </dialog>
+
     <!-- Toast -->
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -1628,6 +1681,6 @@
     </div>
   </section>
 
-  <script src="js/script.js?v=20261127h"></script>
+  <script src="js/script.js?v=20261128d"></script>
 </body>
 </html>
