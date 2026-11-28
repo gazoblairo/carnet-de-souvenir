@@ -3012,11 +3012,19 @@ function initializeProfilePhotoDialog() {
       const context = output.getContext('2d');
       if (!context) throw new Error('Le navigateur ne permet pas de recadrer cette image.');
       drawProfilePhotoCrop(context, size, size / PROFILE_PHOTO_PREVIEW_SIZE);
-      const dataUrl = output.toDataURL('image/png');
-      if (dataUrl === 'data:,') throw new Error('Le navigateur ne peut pas produire un aperçu de cette résolution.');
+      const dataUrl = output.toDataURL('image/webp', 0.9);
+      if (!dataUrl.startsWith('data:image/')) {
+        throw new Error('Le navigateur ne peut pas produire un aperçu de cette résolution.');
+      }
       const target = activeProfilePhotoTarget;
       const returnToViewer = profilePhotoEditorReturnsToViewer;
       target.write(dataUrl);
+      if (target.read() !== dataUrl) {
+        throw new Error('La photo de profil enregistrée ne peut pas être relue.');
+      }
+      const targetImage = document.getElementById(target.imageId);
+      if (!targetImage) throw new Error('L’emplacement de la photo de profil est introuvable.');
+      targetImage.src = dataUrl;
       discardProfilePhotoEditorImage();
       if (returnToViewer) openProfilePhotoViewer(target);
       else closeProfilePhotoDialog();
